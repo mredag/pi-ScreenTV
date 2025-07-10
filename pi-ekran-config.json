@@ -1,0 +1,16 @@
+{
+    "default_video": "/home/pi/pi-ekran/videos/tanitim.mp4",
+    "camera_url": "rtsp://192.168.1.100:554/stream1",
+    "mpv_options": [
+        "--fullscreen",
+        "--no-osc",
+        "--no-input-default-bindings",
+        "--really-quiet",
+        "--no-border",
+        "--no-window-dragging"
+    ],
+    "startup_delay": 10,
+    "web_port": 5000,
+    "fallback_enabled": true,
+    "log_level": "INFO"
+}

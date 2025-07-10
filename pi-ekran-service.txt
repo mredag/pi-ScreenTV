@@ -1,0 +1,22 @@
+[Unit]
+Description=Pi-Ekran Digital Signage Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/pi-ekran
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/pi/.Xauthority"
+Environment="PATH=/home/pi/pi-ekran/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStartPre=/bin/sleep 10
+ExecStart=/home/pi/pi-ekran/venv/bin/python /home/pi/pi-ekran/app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
