@@ -12,6 +12,7 @@ class PiEkranController {
             playVideoBtn: document.getElementById('playVideoBtn'),
             playCameraBtn: document.getElementById('playCameraBtn'),
             stopBtn: document.getElementById('stopBtn'),
+            announceBtn: document.getElementById("announceBtn"),
             currentSource: document.getElementById('currentSource'),
             systemStatus: document.getElementById('systemStatus'),
             lastUpdate: document.getElementById('lastUpdate'),
@@ -32,6 +33,7 @@ class PiEkranController {
         this.elements.playVideoBtn.addEventListener('click', () => this.playVideo());
         this.elements.playCameraBtn.addEventListener('click', () => this.playCamera());
         this.elements.stopBtn.addEventListener('click', () => this.stop());
+        this.elements.announceBtn.addEventListener('click', () => this.announce());
     }
     
     startStatusChecking() {
@@ -80,12 +82,14 @@ class PiEkranController {
         if (!this.isProcessing) {
             this.elements.playVideoBtn.disabled = false;
             this.elements.playCameraBtn.disabled = false;
+            this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
             
             // Buton durumlarını güncelle
             this.elements.playVideoBtn.classList.remove('loading');
             this.elements.playCameraBtn.classList.remove('loading');
             this.elements.stopBtn.classList.remove('loading');
+            this.elements.announceBtn.classList.remove('loading');
         }
     }
     
@@ -164,13 +168,37 @@ class PiEkranController {
         } finally {
             this.isProcessing = false;
             this.elements.stopBtn.classList.remove('loading');
+    async announce() {
+        const text = prompt("Duyuru metni:");
+        if (!text) return;
+        this.isProcessing = true;
+        this.disableAllButtons();
+        this.elements.announceBtn.classList.add("loading");
+        this.addLog("Duyuru gönderiliyor...");
+        try {
+            const response = await fetch("/announce", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ message: text })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog("Duyuru gösterildi", "success");
+            } else {
+                this.addLog(`Hata: ${data.message}`, "error");
+            }
+        } catch (error) {
+            this.handleError("Duyuru hatası");
+        } finally {
+            this.isProcessing = false;
+            this.elements.announceBtn.classList.remove("loading");
         }
     }
-    
     disableAllButtons() {
         this.elements.playVideoBtn.disabled = true;
         this.elements.playCameraBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
+        this.elements.announceBtn.disabled = true;
     }
     
     handleError(message) {

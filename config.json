@@ -1,5 +1,5 @@
 {
-    "default_video": "/home/pi/pi-ekran/videos/tanitim.mp4",
+    "default_video": "videos/tanitim.mp4",
     "camera_url": "rtsp://192.168.1.100:554/stream1",
     "mpv_options": [
         "--fullscreen",
@@ -12,5 +12,13 @@
     "startup_delay": 10,
     "web_port": 5000,
     "fallback_enabled": true,
-    "log_level": "INFO"
+    "log_level": "INFO",
+    "schedule": [
+        {
+            "days": ["Tuesday", "Thursday"],
+            "start": "18:00",
+            "end": "19:00",
+            "source": "camera"
+        }
+    ]
 }

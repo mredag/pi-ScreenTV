@@ -153,6 +153,9 @@ main {
 .stop-button {
     background-color: var(--danger-color);
 }
+.announce-button {
+    background-color: var(--warning-color);
+}
 
 .button-icon {
     width: 40px;
