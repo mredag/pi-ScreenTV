@@ -19,9 +19,11 @@ import signal
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
+VIDEO_DIR = os.path.join(BASE_DIR, 'videos')
 
 # Log dizinini oluştur
 os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(VIDEO_DIR, exist_ok=True)
 
 # Logging yapılandırması
 logging.basicConfig(
@@ -45,6 +47,8 @@ class MediaPlayer:
         self.current_source = None
         self.lock = Lock()
         self.config = self.load_config()
+
+        self.videos = self.get_video_files()
         
         self.scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
         self.start_scheduler()
@@ -64,6 +68,12 @@ class MediaPlayer:
                 "mpv_options": ["--fullscreen", "--no-osc", "--no-input-default-bindings"],
                 "startup_delay": 5
             }
+
+    def get_video_files(self):
+        try:
+            return [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith('.mp4')]
+        except FileNotFoundError:
+            return []
     
     def stop_current(self):
         """Mevcut oynatmayı durdur"""
@@ -88,15 +98,21 @@ class MediaPlayer:
                     return False
             return True
     
-    def play_video(self, video_path=None):
+    def play_video(self, video_list=None):
         """Video oynat"""
-        if video_path is None:
-            video_path = self.config.get('default_video')
-        
-        # Dosya kontrolü
-        if not os.path.exists(video_path):
-            logger.error(f"Video dosyası bulunamadı: {video_path}")
-            return False, "Video dosyası bulunamadı"
+        self.videos = self.get_video_files()
+        if not video_list:
+            if not self.videos:
+                logger.error("Video listesi boş")
+                return False, "Video bulunamadı"
+            video_paths = [os.path.join(VIDEO_DIR, self.videos[0])]
+        else:
+            video_paths = [os.path.join(VIDEO_DIR, v) for v in video_list]
+
+        for path in video_paths:
+            if not os.path.exists(path):
+                logger.error(f"Video dosyası bulunamadı: {path}")
+                return False, "Video dosyası bulunamadı"
         
         # Mevcut oynatmayı durdur
         self.stop_current()
@@ -104,7 +120,7 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop=inf', video_path]
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop=playlist'] + video_paths
                 
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
@@ -114,7 +130,7 @@ class MediaPlayer:
                 )
                 
                 self.current_source = 'video'
-                logger.info(f"Video oynatılıyor: {video_path}")
+                logger.info(f"Video oynatılıyor: {video_paths}")
                 return True, "Video oynatma başlatıldı"
                 
             except Exception as e:
@@ -196,7 +212,8 @@ class MediaPlayer:
         if rule.get("source") == "camera":
             self.play_camera()
         elif rule.get("source") == "video":
-            self.play_video(rule.get("video"))
+            video = rule.get("video")
+            self.play_video([video] if video else None)
 
     def play_default(self):
         if self.current_source != "video":
@@ -234,11 +251,17 @@ def status():
     """Sistem durumu"""
     return jsonify(player.get_status())
 
+@app.route('/videos')
+def videos():
+    return jsonify({'videos': player.get_video_files()})
+
 @app.route('/play_video', methods=['POST'])
 def play_video():
     """Video oynatma endpoint'i"""
     logger.info("Video oynatma isteği alındı")
-    success, message = player.play_video()
+    data = request.get_json(silent=True) or {}
+    videos = data.get('videos')
+    success, message = player.play_video(videos)
     
     return jsonify({
         'success': success,
