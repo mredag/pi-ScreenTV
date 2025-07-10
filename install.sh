@@ -35,6 +35,11 @@ deactivate
 step "4. Creating required directories"
 mkdir -p videos logs
 
+if [ -f logo.png ]; then
+  step "Setting desktop wallpaper"
+  pcmanfm --set-wallpaper "$BASE_DIR/logo.png" || true
+fi
+
 step "5. Verifying MPV installation"
 if ! command -v mpv >/dev/null; then
   echo -e "${RED}mpv could not be found. Please check the package installation.${NC}"
