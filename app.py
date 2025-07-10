@@ -118,6 +118,9 @@ class MediaPlayer:
                 return False, "Video bulunamadı"
             video_paths = [os.path.join(VIDEO_DIR, self.videos[0])]
         else:
+            # Gelen deger tek bir dosya adi ise listeye cevir
+            if isinstance(video_list, str):
+                video_list = [video_list]
             video_paths = [os.path.join(VIDEO_DIR, v) for v in video_list]
 
         for path in video_paths:
