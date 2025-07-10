@@ -46,6 +46,7 @@ class MediaPlayer:
         self.current_process = None
         self.current_source = None
         self.lock = Lock()
+        self.automation_paused = False
         self.config = self.load_config()
 
         self.videos = self.get_video_files()
@@ -64,10 +65,20 @@ class MediaPlayer:
             # Varsayılan yapılandırma
             return {
                 "default_video": os.path.join(BASE_DIR, "videos", "tanitim.mp4"),
-                "camera_url": "rtsp://192.168.1.100:554/stream1",
+                "cameras": [{"name": "Kamera 1", "url": "rtsp://192.168.1.100:554/stream1"}],
                 "mpv_options": ["--fullscreen", "--no-osc", "--no-input-default-bindings"],
                 "startup_delay": 5
             }
+
+    def save_config(self):
+        try:
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4)
+            logger.info("Yapılandırma kaydedildi")
+            return True
+        except Exception as e:
+            logger.error(f"Yapılandırma kaydedilemedi: {e}")
+            return False
 
     def get_video_files(self):
         try:
@@ -114,8 +125,9 @@ class MediaPlayer:
                 logger.error(f"Video dosyası bulunamadı: {path}")
                 return False, "Video dosyası bulunamadı"
         
-        # Mevcut oynatmayı durdur
+        # Mevcut oynatmayı durdur ve otomasyonu duraklat
         self.stop_current()
+        self.pause_automation()
         
         with self.lock:
             try:
@@ -137,16 +149,24 @@ class MediaPlayer:
                 logger.error(f"Video oynatma hatası: {e}")
                 return False, f"Hata: {str(e)}"
     
-    def play_camera(self):
+    def play_camera(self, name=None):
         """Kamera yayınını göster"""
-        camera_url = self.config.get('camera_url')
-        
+        cameras = self.config.get('cameras', [])
+        camera_url = None
+        if name:
+            for cam in cameras:
+                if cam.get('name') == name:
+                    camera_url = cam.get('url')
+                    break
+        if not camera_url and cameras:
+            camera_url = cameras[0].get('url')
         if not camera_url:
             logger.error("Kamera URL'si yapılandırılmamış")
             return False, "Kamera yapılandırması eksik"
         
-        # Mevcut oynatmayı durdur
+        # Mevcut oynatmayı durdur ve otomasyonu duraklat
         self.stop_current()
+        self.pause_automation()
         
         with self.lock:
             try:
@@ -175,13 +195,15 @@ class MediaPlayer:
                 return {
                     'playing': True,
                     'source': self.current_source,
-                    'status': f"{self.current_source.capitalize()} oynatılıyor"
+                    'status': f"{self.current_source.capitalize()} oynatılıyor",
+                    'automation_paused': self.automation_paused
                 }
             else:
                 return {
                     'playing': False,
                     'source': None,
-                    'status': 'Beklemede'
+                    'status': 'Beklemede',
+                    'automation_paused': self.automation_paused
                 }
     def start_scheduler(self):
         for rule in self.config.get("schedule", []):
@@ -209,15 +231,35 @@ class MediaPlayer:
         self.scheduler.start()
 
     def apply_schedule_rule(self, rule):
+        if self.automation_paused:
+            return
         if rule.get("source") == "camera":
-            self.play_camera()
+            self.play_camera(rule.get("camera"))
         elif rule.get("source") == "video":
             video = rule.get("video")
             self.play_video([video] if video else None)
 
     def play_default(self):
+        if self.automation_paused:
+            return
         if self.current_source != "video":
             self.play_video()
+
+    def add_camera(self, name, url):
+        cams = self.config.setdefault('cameras', [])
+        cams.append({'name': name, 'url': url})
+        self.save_config()
+
+    def remove_camera(self, name):
+        cams = self.config.get('cameras', [])
+        self.config['cameras'] = [c for c in cams if c.get('name') != name]
+        self.save_config()
+
+    def pause_automation(self):
+        self.automation_paused = True
+
+    def resume_automation(self):
+        self.automation_paused = False
 
 
     def show_announcement(self, text, duration=10):
@@ -299,6 +341,48 @@ def announce():
     logger.info('Duyuru istegi alindi')
     success, msg = player.show_announcement(message)
     return jsonify({'success': success, 'message': msg})
+
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'success': False, 'message': 'Dosya bulunamadı'})
+    path = os.path.join(VIDEO_DIR, file.filename)
+    file.save(path)
+    return jsonify({'success': True})
+
+
+@app.route('/cameras', methods=['GET', 'POST', 'DELETE'])
+def cameras():
+    if request.method == 'GET':
+        return jsonify({'cameras': player.config.get('cameras', [])})
+    data = request.get_json(force=True)
+    name = data.get('name')
+    if request.method == 'POST':
+        url = data.get('url')
+        player.add_camera(name, url)
+    elif request.method == 'DELETE':
+        player.remove_camera(name)
+    return jsonify({'success': True})
+
+
+@app.route('/resume', methods=['POST'])
+def resume():
+    player.resume_automation()
+    return jsonify({'success': True})
+
+
+@app.route('/system_info')
+def system_info():
+    temp = ''
+    try:
+        out = subprocess.check_output(['vcgencmd', 'measure_temp']).decode()
+        temp = out.strip().split('=')[1]
+    except Exception:
+        temp = 'N/A'
+    disk = subprocess.check_output(['df', '-h', '/']).decode().splitlines()[1].split()[4]
+    return jsonify({'temperature': temp, 'disk_usage': disk})
 
 
 def startup_sequence():

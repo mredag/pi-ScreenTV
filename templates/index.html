@@ -20,6 +20,11 @@
             <div class="control-section">
                 <h2>Ekran Kontrolü</h2>
                 <div id="videoList" class="video-list"></div>
+                <div class="camera-list" id="cameraList"></div>
+                <div class="upload-area">
+                    <input type="file" id="uploadInput" accept="video/mp4">
+                    <button class="control-button" id="uploadBtn">Video Yükle</button>
+                </div>
                 
                 <div class="button-grid">
                     <button class="control-button video-button" id="playVideoBtn" disabled>
@@ -48,6 +53,7 @@
                         </svg>
                         <span>Duyuru Yap</span>
                     </button>
+                    <button class="control-button" id="resumeBtn" disabled>Otomasyonu Devam Ettir</button>
                 </div>
             </div>
 
@@ -65,6 +71,14 @@
                     <div class="info-item">
                         <span class="info-label">Son Güncelleme:</span>
                         <span class="info-value" id="lastUpdate">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">CPU Sıcaklığı:</span>
+                        <span class="info-value" id="cpuTemp">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Disk Kullanımı:</span>
+                        <span class="info-value" id="diskUsage">-</span>
                     </div>
                 </div>
             </div>

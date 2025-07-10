@@ -13,10 +13,16 @@ class PiEkranController {
             playCameraBtn: document.getElementById('playCameraBtn'),
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
+            uploadInput: document.getElementById('uploadInput'),
+            uploadBtn: document.getElementById('uploadBtn'),
+            resumeBtn: document.getElementById('resumeBtn'),
+            cameraList: document.getElementById('cameraList'),
             videoList: document.getElementById('videoList'),
             currentSource: document.getElementById('currentSource'),
             systemStatus: document.getElementById('systemStatus'),
             lastUpdate: document.getElementById('lastUpdate'),
+            cpuTemp: document.getElementById('cpuTemp'),
+            diskUsage: document.getElementById('diskUsage'),
             logContainer: document.getElementById('logContainer')
         };
         
@@ -38,6 +44,8 @@ class PiEkranController {
         this.elements.playCameraBtn.addEventListener('click', () => this.playCamera());
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
+        this.elements.uploadBtn.addEventListener('click', () => this.upload());
+        this.elements.resumeBtn.addEventListener('click', () => this.resume());
     }
     
     startStatusChecking() {
@@ -51,15 +59,21 @@ class PiEkranController {
     
     async checkStatus() {
         try {
-            const response = await fetch('/status');
-            const data = await response.json();
-            this.updateUI(data);
+            const [statusRes, infoRes, camRes] = await Promise.all([
+                fetch('/status'),
+                fetch('/system_info'),
+                fetch('/cameras')
+            ]);
+            const status = await statusRes.json();
+            const info = await infoRes.json();
+            const cams = await camRes.json();
+            this.updateUI(status, info, cams);
         } catch (error) {
             this.handleError('Sunucuya bağlanılamıyor');
         }
     }
     
-    updateUI(status) {
+    updateUI(status, info, cams) {
         // Durum göstergesini güncelle
         this.elements.statusIndicator.className = 'status-indicator';
         
@@ -80,6 +94,13 @@ class PiEkranController {
         
         // Butonları güncelle
         this.updateButtons(status);
+        if (info) {
+            this.elements.cpuTemp.textContent = info.temperature;
+            this.elements.diskUsage.textContent = info.disk_usage;
+        }
+        if (cams && cams.cameras) {
+            this.renderCameraList(cams.cameras);
+        }
     }
     
     updateButtons(status) {
@@ -88,6 +109,8 @@ class PiEkranController {
             this.elements.playCameraBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
+            this.elements.uploadBtn.disabled = false;
+            this.elements.resumeBtn.disabled = !status.automation_paused;
             
             // Buton durumlarını güncelle
             this.elements.playVideoBtn.classList.remove('loading');
@@ -154,6 +177,31 @@ class PiEkranController {
             this.elements.playCameraBtn.classList.remove('loading');
         }
     }
+
+    async playCameraByName(name) {
+        if (this.isProcessing) return;
+        this.isProcessing = true;
+        this.disableAllButtons();
+        this.addLog('Kamera yayını isteği gönderiliyor...');
+        try {
+            const response = await fetch('/play_camera', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Kamera yayını başarıyla başlatıldı', 'success');
+                this.updateUI(data.status);
+            } else {
+                this.addLog(`Hata: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.handleError('Kamera yayını hatası');
+        } finally {
+            this.isProcessing = false;
+        }
+    }
     
     async stop() {
         if (this.isProcessing) return;
@@ -206,6 +254,54 @@ class PiEkranController {
         });
     }
 
+    renderCameraList(list) {
+        this.elements.cameraList.innerHTML = '';
+        list.forEach(cam => {
+            const btn = document.createElement('button');
+            btn.textContent = cam.name;
+            btn.className = 'camera-item';
+            btn.addEventListener('click', () => this.playCameraByName(cam.name));
+            this.elements.cameraList.appendChild(btn);
+        });
+    }
+
+    async upload() {
+        const file = this.elements.uploadInput.files[0];
+        if (!file) return;
+        const form = new FormData();
+        form.append('file', file);
+        this.isProcessing = true;
+        this.disableAllButtons();
+        try {
+            const res = await fetch('/upload', {method: 'POST', body: form});
+            const data = await res.json();
+            if (data.success) {
+                this.addLog('Video yüklendi', 'success');
+                this.loadVideos();
+            } else {
+                this.addLog('Yükleme hatası', 'error');
+            }
+        } catch (e) {
+            this.addLog('Yükleme hatası', 'error');
+        } finally {
+            this.isProcessing = false;
+            this.updateButtons({playing:false});
+        }
+    }
+
+    async resume() {
+        this.isProcessing = true;
+        this.disableAllButtons();
+        try {
+            await fetch('/resume', {method: 'POST'});
+            this.addLog('Otomasyon devam ediyor', 'success');
+            this.checkStatus();
+        } finally {
+            this.isProcessing = false;
+            this.updateButtons({playing:false});
+        }
+    }
+
     async announce() {
         const text = prompt("Duyuru metni:");
         if (!text) return;
@@ -237,6 +333,8 @@ class PiEkranController {
         this.elements.playCameraBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
         this.elements.announceBtn.disabled = true;
+        this.elements.uploadBtn.disabled = true;
+        this.elements.resumeBtn.disabled = true;
     }
     
     handleError(message) {
