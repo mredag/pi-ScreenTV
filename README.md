@@ -1,5 +1,29 @@
 # Pi-Ekran Kurulum ve Yapılandırma Kılavuzu
 
+## Hızlı Kurulum (GitHub)
+
+GitHub deposunu kullanarak uygulamayı birkaç komutla kurabilirsiniz. `pi` kullanıcısı ile oturum açtıktan sonra aşağıdaki adımları izleyin:
+
+```bash
+sudo apt update && sudo apt install -y git
+git clone https://github.com/mredag/pi-ScreenTV.git ~/pi-ekran
+cd ~/pi-ekran
+bash setup.sh
+```
+
+Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://pi-ekran.local:5000` adresinden erişebilirsiniz.
+
+### Güncelleme
+
+Mevcut kurulumunuzu güncellemek için aynı dizinde aşağıdaki komutları çalıştırmanız yeterlidir:
+
+```bash
+cd ~/pi-ekran
+git pull
+bash setup.sh
+sudo systemctl restart pi-ekran.service
+```
+
 ## Faz 0: Donanım ve Sistem Hazırlığı
 
 ### 1. Donanım Gereksinimleri
