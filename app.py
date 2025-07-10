@@ -11,7 +11,8 @@ import time
 import logging
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
-from threading import Lock, Thread
+from threading import Lock
+from apscheduler.schedulers.background import BackgroundScheduler
 import signal
 
 # Uygulama dizini
@@ -45,8 +46,8 @@ class MediaPlayer:
         self.lock = Lock()
         self.config = self.load_config()
         
-        self.schedule_thread = Thread(target=self.schedule_loop, daemon=True)
-        self.schedule_thread.start()
+        self.scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
+        self.start_scheduler()
     def load_config(self):
         """Yapılandırma dosyasını yükle"""
         try:
@@ -166,26 +167,40 @@ class MediaPlayer:
                     'source': None,
                     'status': 'Beklemede'
                 }
-    def schedule_loop(self):
-        while True:
-            now = datetime.now()
-            day = now.strftime("%A")
-            time_str = now.strftime("%H:%M")
-            matched = None
-            for rule in self.config.get("schedule", []):
-                if day in rule.get("days", []) and rule.get("start") <= time_str < rule.get("end"):
-                    matched = rule
-                    break
-            if matched:
-                if matched.get("source") == "camera" and self.current_source != "camera":
+    def start_scheduler(self):
+        for rule in self.config.get("schedule", []):
+            days = [d.lower()[:3] for d in rule.get("days", [])]
+            start_h, start_m = map(int, rule.get("start", "0:0").split(":"))
+            end_h, end_m = map(int, rule.get("end", "0:0").split(":"))
 
-                    self.play_camera()
-                elif matched.get("source") == "video" and self.current_source != "video":
-                    self.play_video(matched.get("video"))
-            else:
-                if self.current_source != "video":
-                    self.play_video()
-            time.sleep(30)
+            self.scheduler.add_job(
+                self.apply_schedule_rule,
+                "cron",
+                day_of_week=",".join(days),
+                hour=start_h,
+                minute=start_m,
+                args=[rule],
+            )
+
+            self.scheduler.add_job(
+                self.play_default,
+                "cron",
+                day_of_week=",".join(days),
+                hour=end_h,
+                minute=end_m,
+            )
+
+        self.scheduler.start()
+
+    def apply_schedule_rule(self, rule):
+        if rule.get("source") == "camera":
+            self.play_camera()
+        elif rule.get("source") == "video":
+            self.play_video(rule.get("video"))
+
+    def play_default(self):
+        if self.current_source != "video":
+            self.play_video()
 
 
     def show_announcement(self, text, duration=10):
@@ -285,6 +300,10 @@ def startup_sequence():
 def signal_handler(sig, frame):
     """Graceful shutdown"""
     logger.info("Kapatma sinyali alındı")
+    try:
+        player.scheduler.shutdown()
+    except Exception:
+        pass
     player.stop_current()
     exit(0)
 

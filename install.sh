@@ -29,7 +29,7 @@ step "3. Setting up Python virtual environment"
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install flask
+pip install -r requirements.txt
 deactivate
 
 step "4. Creating required directories"
