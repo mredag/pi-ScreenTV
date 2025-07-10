@@ -20,10 +20,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 VIDEO_DIR = os.path.join(BASE_DIR, 'videos')
+IMAGE_DIR = os.path.join(BASE_DIR, 'images')
 
 # Log dizinini oluştur
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(VIDEO_DIR, exist_ok=True)
+os.makedirs(IMAGE_DIR, exist_ok=True)
 
 # Logging yapılandırması
 logging.basicConfig(
@@ -135,7 +137,7 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop=playlist'] + video_paths
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop=inf'] + video_paths
                 
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
@@ -189,6 +191,28 @@ class MediaPlayer:
                 
             except Exception as e:
                 logger.error(f"Kamera yayını hatası: {e}")
+                return False, f"Hata: {str(e)}"
+
+    def play_slideshow(self, duration=5):
+        """Resim slayt gösterisi oynat"""
+        image_files = [os.path.join(IMAGE_DIR, f) for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+
+        if not image_files:
+            logger.error("Slayt için resim bulunamadı")
+            return False, "Resim bulunamadı"
+
+        self.stop_current()
+        self.pause_automation()
+
+        with self.lock:
+            try:
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + [f'--image-display-duration={duration}', '--loop=inf'] + image_files
+                self.current_process = subprocess.Popen(cmd)
+                self.current_source = 'slayt'
+                logger.info(f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_files)}")
+                return True, "Slayt gösterisi başlatıldı"
+            except Exception as e:
+                logger.error(f"Slayt gösterisi hatası: {e}")
                 return False, f"Hata: {str(e)}"
     
     def get_status(self):
@@ -326,6 +350,17 @@ def play_camera():
         'status': player.get_status()
     })
 
+@app.route('/play_slideshow', methods=['POST'])
+def play_slideshow():
+    """Slayt gösterisi endpoint'i"""
+    logger.info("Slayt gösterisi isteği alındı")
+    success, message = player.play_slideshow()
+    return jsonify({
+        'success': success,
+        'message': message,
+        'status': player.get_status()
+    })
+
 @app.route('/stop', methods=['POST'])
 def stop():
     """Oynatmayı durdur"""
@@ -378,13 +413,20 @@ def resume():
 
 @app.route('/system_info')
 def system_info():
-    temp = ''
+    temp = 'N/A'
+    disk = 'N/A'
     try:
         out = subprocess.check_output(['vcgencmd', 'measure_temp']).decode()
         temp = out.strip().split('=')[1]
     except Exception:
-        temp = 'N/A'
-    disk = subprocess.check_output(['df', '-h', '/']).decode().splitlines()[1].split()[4]
+        logger.warning("İşlemci sıcaklığı okunamadı (vcgencmd komutu bulunamadı?).")
+
+    try:
+        out = subprocess.check_output(['df', '-h', '/']).decode().splitlines()[1].split()
+        disk = f"{out[2]} / {out[1]} ({out[4]})"
+    except Exception:
+        logger.warning("Disk bilgisi okunamadı.")
+
     return jsonify({'temperature': temp, 'disk_usage': disk})
 
 
