@@ -8,7 +8,7 @@ GitHub deposunu kullanarak uygulamayı birkaç komutla kurabilirsiniz. `pi` kull
 sudo apt update && sudo apt install -y git
 git clone https://github.com/mredag/pi-ScreenTV.git ~/pi-ekran
 cd ~/pi-ekran
-bash setup.sh
+bash install.sh
 ```
 
 Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://pi-ekran.local:5000` adresinden erişebilirsiniz.
@@ -20,7 +20,7 @@ Mevcut kurulumunuzu güncellemek için aynı dizinde aşağıdaki komutları ça
 ```bash
 cd ~/pi-ekran
 git pull
-bash setup.sh
+bash install.sh
 sudo systemctl restart pi-ekran.service
 ```
 
