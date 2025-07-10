@@ -11,7 +11,7 @@ import time
 import logging
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
-from threading import Lock
+from threading import Lock, Thread
 import signal
 
 # Uygulama dizini
@@ -45,6 +45,8 @@ class MediaPlayer:
         self.lock = Lock()
         self.config = self.load_config()
         
+        self.schedule_thread = Thread(target=self.schedule_loop, daemon=True)
+        self.schedule_thread.start()
     def load_config(self):
         """Yapılandırma dosyasını yükle"""
         try:
@@ -101,7 +103,7 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--loop=inf', video_path]
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop=inf', video_path]
                 
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
@@ -132,7 +134,7 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + [camera_url]
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', camera_url]
                 
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
@@ -164,6 +166,45 @@ class MediaPlayer:
                     'source': None,
                     'status': 'Beklemede'
                 }
+    def schedule_loop(self):
+        while True:
+            now = datetime.now()
+            day = now.strftime("%A")
+            time_str = now.strftime("%H:%M")
+            matched = None
+            for rule in self.config.get("schedule", []):
+                if day in rule.get("days", []) and rule.get("start") <= time_str < rule.get("end"):
+                    matched = rule
+                    break
+            if matched:
+                if matched.get("source") == "camera" and self.current_source != "camera":
+
+                    self.play_camera()
+                elif matched.get("source") == "video" and self.current_source != "video":
+                    self.play_video(matched.get("video"))
+            else:
+                if self.current_source != "video":
+                    self.play_video()
+            time.sleep(30)
+
+
+    def show_announcement(self, text, duration=10):
+        socket_path = "/tmp/mpvsocket"
+        if not os.path.exists(socket_path):
+            logger.error("MPV soketi bulunamadı")
+            return False, "Oynatıcı hazır değil"
+        try:
+            import socket as s
+            client = s.socket(s.AF_UNIX, s.SOCK_STREAM)
+            client.connect(socket_path)
+            cmd = {"command": ["show-text", text, duration * 1000]}
+            client.send((json.dumps(cmd) + "\n").encode("utf-8"))
+            client.close()
+            logger.info("Duyuru gösterildi")
+            return True, "Duyuru gösterildi"
+        except Exception as e:
+            logger.error(f"Duyuru hatası: {e}")
+            return False, str(e)
 
 # Global media player instance
 player = MediaPlayer()
@@ -213,6 +254,14 @@ def stop():
         'message': 'Oynatma durduruldu' if success else 'Hata oluştu',
         'status': player.get_status()
     })
+@app.route('/announce', methods=['POST'])
+def announce():
+    data = request.get_json(force=True)
+    message = data.get('message', '') if data else ''
+    logger.info('Duyuru istegi alindi')
+    success, msg = player.show_announcement(message)
+    return jsonify({'success': success, 'message': msg})
+
 
 def startup_sequence():
     """Başlangıç dizisi - fallback mantığı"""
@@ -249,4 +298,4 @@ if __name__ == '__main__':
     
     # Flask uygulamasını başlat
     logger.info("Web sunucusu başlatılıyor...")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=player.config.get('web_port', 5000), debug=False)
