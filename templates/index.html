@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi-Ekran Kontrol Paneli</title>
+    <title>Eform Spor Merkezi TV Kontrol Paneli</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Pi-Ekran Kontrol Paneli</h1>
+            <h1>Eform Spor Merkezi TV Kontrol Paneli</h1>
             <div class="status-indicator" id="statusIndicator">
                 <span class="status-dot"></span>
                 <span class="status-text" id="statusText">Bağlanıyor...</span>
@@ -19,13 +19,14 @@
         <main>
             <div class="control-section">
                 <h2>Ekran Kontrolü</h2>
+                <div id="videoList" class="video-list"></div>
                 
                 <div class="button-grid">
                     <button class="control-button video-button" id="playVideoBtn" disabled>
                         <svg class="button-icon" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z"/>
                         </svg>
-                        <span>Tanıtım Videosunu Oynat</span>
+                        <span>Seçilen Videoları Oynat</span>
                     </button>
 
                     <button class="control-button camera-button" id="playCameraBtn" disabled>
@@ -77,7 +78,7 @@
         </main>
 
         <footer>
-            <p>Pi-Ekran v2.0 | Raspberry Pi Dijital Tabela Sistemi</p>
+            <p>Eform Spor Merkezi TV Kontrol Paneli</p>
         </footer>
     </div>
 

@@ -13,6 +13,7 @@ class PiEkranController {
             playCameraBtn: document.getElementById('playCameraBtn'),
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
+            videoList: document.getElementById('videoList'),
             currentSource: document.getElementById('currentSource'),
             systemStatus: document.getElementById('systemStatus'),
             lastUpdate: document.getElementById('lastUpdate'),
@@ -27,6 +28,9 @@ class PiEkranController {
         
         // Periyodik durum kontrolü başlat
         this.startStatusChecking();
+
+        // Videoları yükle
+        this.loadVideos();
     }
     
     bindEvents() {
@@ -95,14 +99,20 @@ class PiEkranController {
     
     async playVideo() {
         if (this.isProcessing) return;
-        
+
+        const selected = Array.from(document.querySelectorAll('#videoList input[type="checkbox"]:checked')).map(c => c.value);
+
         this.isProcessing = true;
         this.disableAllButtons();
         this.elements.playVideoBtn.classList.add('loading');
         this.addLog('Video oynatma isteği gönderiliyor...');
-        
+
         try {
-            const response = await fetch('/play_video', { method: 'POST' });
+            const response = await fetch('/play_video', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({videos: selected})
+            });
             const data = await response.json();
             
             if (data.success) {
@@ -165,9 +175,37 @@ class PiEkranController {
             }
         } catch (error) {
             this.handleError('Durdurma hatası');
+
         } finally {
             this.isProcessing = false;
             this.elements.stopBtn.classList.remove('loading');
+        }
+    }
+
+    async loadVideos() {
+        try {
+            const response = await fetch('/videos');
+            const data = await response.json();
+            this.renderVideoList(data.videos || []);
+        } catch (e) {
+            this.addLog('Video listesi alınamadı', 'error');
+        }
+    }
+
+    renderVideoList(list) {
+        this.elements.videoList.innerHTML = '';
+        list.forEach(name => {
+            const label = document.createElement('label');
+            label.className = 'video-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = name;
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(' ' + name));
+            this.elements.videoList.appendChild(label);
+        });
+    }
+
     async announce() {
         const text = prompt("Duyuru metni:");
         if (!text) return;
@@ -237,3 +275,4 @@ class PiEkranController {
 document.addEventListener('DOMContentLoaded', () => {
     window.piEkran = new PiEkranController();
 });
+
