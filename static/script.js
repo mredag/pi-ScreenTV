@@ -19,7 +19,7 @@ class PiEkranController {
             cameraList: document.getElementById('cameraList'),
             videoList: document.getElementById('videoList'),
             currentSource: document.getElementById('currentSource'),
-            systemStatus: document.getElementById('systemStatus'),
+            playSlideshowBtn: document.getElementById('playSlideshowBtn'),
             lastUpdate: document.getElementById('lastUpdate'),
             cpuTemp: document.getElementById('cpuTemp'),
             diskUsage: document.getElementById('diskUsage'),
@@ -31,7 +31,8 @@ class PiEkranController {
         
         // Durumu kontrol et
         this.checkStatus();
-        
+        this.checkSystemInfo();
+
         // Periyodik durum kontrolü başlat
         this.startStatusChecking();
 
@@ -42,6 +43,7 @@ class PiEkranController {
     bindEvents() {
         this.elements.playVideoBtn.addEventListener('click', () => this.playVideo());
         this.elements.playCameraBtn.addEventListener('click', () => this.playCamera());
+        this.elements.playSlideshowBtn.addEventListener('click', () => this.playSlideshow());
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
         this.elements.uploadBtn.addEventListener('click', () => this.upload());
@@ -53,27 +55,38 @@ class PiEkranController {
         this.statusCheckInterval = setInterval(() => {
             if (!this.isProcessing) {
                 this.checkStatus();
+                this.checkSystemInfo();
             }
         }, 5000);
     }
-    
+
     async checkStatus() {
         try {
-            const [statusRes, infoRes, camRes] = await Promise.all([
+            const [statusRes, camRes] = await Promise.all([
                 fetch('/status'),
-                fetch('/system_info'),
                 fetch('/cameras')
             ]);
             const status = await statusRes.json();
-            const info = await infoRes.json();
             const cams = await camRes.json();
-            this.updateUI(status, info, cams);
+            this.updateUI(status, cams);
         } catch (error) {
             this.handleError('Sunucuya bağlanılamıyor');
         }
     }
+
+    async checkSystemInfo() {
+        try {
+            const response = await fetch('/system_info');
+            const data = await response.json();
+            this.elements.cpuTemp.textContent = data.temperature;
+            this.elements.diskUsage.textContent = data.disk_usage;
+        } catch (error) {
+            this.elements.cpuTemp.textContent = 'Hata';
+            this.elements.diskUsage.textContent = 'Hata';
+        }
+    }
     
-    updateUI(status, info, cams) {
+    updateUI(status, cams) {
         // Durum göstergesini güncelle
         this.elements.statusIndicator.className = 'status-indicator';
         
@@ -86,18 +99,13 @@ class PiEkranController {
         }
         
         // Bilgileri güncelle
-        this.elements.currentSource.textContent = status.source ? 
-            (status.source === 'video' ? 'Tanıtım Videosu' : 'Canlı Kamera') : 
+        this.elements.currentSource.textContent = status.source ?
+            (status.source === 'video' ? 'Tanıtım Videosu' : (status.source === 'camera' ? 'Canlı Kamera' : status.source)) :
             'Yok';
-        this.elements.systemStatus.textContent = status.playing ? 'Oynatılıyor' : 'Beklemede';
         this.elements.lastUpdate.textContent = new Date().toLocaleTimeString('tr-TR');
-        
+
         // Butonları güncelle
         this.updateButtons(status);
-        if (info) {
-            this.elements.cpuTemp.textContent = info.temperature;
-            this.elements.diskUsage.textContent = info.disk_usage;
-        }
         if (cams && cams.cameras) {
             this.renderCameraList(cams.cameras);
         }
@@ -107,6 +115,7 @@ class PiEkranController {
         if (!this.isProcessing) {
             this.elements.playVideoBtn.disabled = false;
             this.elements.playCameraBtn.disabled = false;
+            this.elements.playSlideshowBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
             this.elements.uploadBtn.disabled = false;
@@ -200,6 +209,30 @@ class PiEkranController {
             this.handleError('Kamera yayını hatası');
         } finally {
             this.isProcessing = false;
+        }
+    }
+
+    async playSlideshow() {
+        if (this.isProcessing) return;
+        this.isProcessing = true;
+        this.disableAllButtons();
+        this.elements.playSlideshowBtn.classList.add('loading');
+        this.addLog('Slayt gösterisi isteği gönderiliyor...');
+
+        try {
+            const response = await fetch('/play_slideshow', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Slayt gösterisi başarıyla başlatıldı', 'success');
+                this.updateUI(data.status);
+            } else {
+                this.addLog(`Hata: ${data.message}`, 'error');
+            }
+        } catch (error) {
+            this.handleError('Slayt gösterisi hatası');
+        } finally {
+            this.isProcessing = false;
+            this.elements.playSlideshowBtn.classList.remove('loading');
         }
     }
     
@@ -331,6 +364,7 @@ class PiEkranController {
     disableAllButtons() {
         this.elements.playVideoBtn.disabled = true;
         this.elements.playCameraBtn.disabled = true;
+        this.elements.playSlideshowBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
         this.elements.announceBtn.disabled = true;
         this.elements.uploadBtn.disabled = true;

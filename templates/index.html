@@ -41,6 +41,13 @@
                         <span>Kamerayı Göster</span>
                     </button>
 
+                    <button class="control-button slideshow-button" id="playSlideshowBtn" disabled>
+                        <svg class="button-icon" viewBox="0 0 24 24">
+                            <path d="M21.58,16.09L17.17,11.68L7,21.85L2.59,17.44L0,20.03L7,27.03L24.17,9.86L21.58,16.09Z" />
+                        </svg>
+                        <span>Slayt Gösterisi Başlat</span>
+                    </button>
+
                     <button class="control-button stop-button" id="stopBtn" disabled>
                         <svg class="button-icon" viewBox="0 0 24 24">
                             <path d="M18 18H6V6h12v12z"/>
@@ -65,20 +72,16 @@
                         <span class="info-value" id="currentSource">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Sistem Durumu:</span>
-                        <span class="info-value" id="systemStatus">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Son Güncelleme:</span>
-                        <span class="info-value" id="lastUpdate">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">CPU Sıcaklığı:</span>
+                        <span class="info-label">İşlemci Sıcaklığı:</span>
                         <span class="info-value" id="cpuTemp">-</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Disk Kullanımı:</span>
                         <span class="info-value" id="diskUsage">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Son Güncelleme:</span>
+                        <span class="info-value" id="lastUpdate">-</span>
                     </div>
                 </div>
             </div>

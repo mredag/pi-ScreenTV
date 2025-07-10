@@ -189,6 +189,9 @@ main {
 .announce-button {
     background-color: var(--warning-color);
 }
+.slideshow-button {
+    background-color: var(--secondary-color);
+}
 
 .button-icon {
     width: 40px;
