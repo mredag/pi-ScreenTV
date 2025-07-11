@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Python sanal ortamları
 venv/
 env/
@@ -40,6 +39,3 @@ htmlcov/
 # Pip wheel cache
 *.whl
 pip-wheel-metadata/
-=======
-venv/
->>>>>>> 842914ac63f3f369d166f071f928bfaf1a9edada
