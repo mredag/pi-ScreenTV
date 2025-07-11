@@ -623,6 +623,98 @@ class PiEkranController {
         }
     }
 
+    async scanNetwork() {
+        this.elements.scanButtonText.textContent = 'Ağ Taranıyor...';
+        this.elements.scanNetworkBtn.disabled = true;
+        this.elements.scanResults.style.display = 'none';
+        this.elements.discoveredCameras.innerHTML = '';
+        this.addLog('Ağdaki kameralar taranıyor...');
+
+        try {
+            const response = await fetch('/discover_cameras', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                this.addLog(`${data.cameras.length} kamera bulundu.`, 'success');
+                this.renderDiscoveredCameras(data.cameras);
+            } else {
+                this.addLog(`Kamera bulunamadı: ${data.message}`, 'warning');
+            }
+        } catch (e) {
+            this.handleError('Kamera keşfi sırasında bir hata oluştu.');
+        } finally {
+            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
+            this.elements.scanNetworkBtn.disabled = false;
+        }
+    }
+
+    renderDiscoveredCameras(cameras) {
+        this.elements.scanResults.style.display = 'block';
+        const list = this.elements.discoveredCameras;
+        list.innerHTML = '';
+
+        if (cameras.length === 0) {
+            list.innerHTML = '<p>Ağda ONVIF kamera bulunamadı.</p>';
+            return;
+        }
+
+        cameras.forEach(camera => {
+            const item = document.createElement('div');
+            item.className = 'discovered-camera-item';
+            item.innerHTML = `
+                <span>${camera.hostname || 'İsimsiz Kamera'} (${camera.ip}:${camera.port})</span>
+                <button class="add-btn">Ekle</button>
+            `;
+            item.querySelector('.add-btn').addEventListener('click', () => {
+                this.openCredentialModal(camera);
+            });
+            list.appendChild(item);
+        });
+    }
+
+    openCredentialModal(camera) {
+        this.elements.credentialModal.classList.add('show');
+        this.elements.credentialForm.dataset.ip = camera.ip;
+        this.elements.credentialForm.dataset.port = camera.port;
+        this.elements.discoveredCameraName.value = camera.hostname || `Kamera ${camera.ip}`;
+    }
+
+    closeCredentialModal() {
+        this.elements.credentialModal.classList.remove('show');
+        this.elements.credentialForm.reset();
+    }
+
+    async addDiscoveredCamera(event) {
+        event.preventDefault();
+        const form = this.elements.credentialForm;
+        const name = this.elements.discoveredCameraName.value;
+        const username = this.elements.cameraUsername.value;
+        const password = this.elements.cameraPassword.value;
+        const ip = form.dataset.ip;
+        const port = form.dataset.port;
+
+        const url = `rtsp://${username}:${password}@${ip}:${port}/stream1`; // Varsayılan stream yolu
+
+        try {
+            const response = await fetch('/cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name, url, ip, port, username, password, discovered: true })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Keşfedilen kamera eklendi', 'success');
+                this.loadModalCameras();
+                this.loadCameras();
+                this.closeCredentialModal();
+            } else {
+                this.addLog('Kamera eklenemedi', 'error');
+            }
+        } catch (e) {
+            this.addLog('Kamera eklenirken hata', 'error');
+        }
+    }
+
     // Slideshow Modal Methods
     async openSlideshowModal() {
         this.elements.slideshowModal.classList.add('show');
