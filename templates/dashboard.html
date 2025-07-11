@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <img class="avatar" src="https://source.unsplash.com/random/100x100?face" alt="avatar">
+                <span class="username">Kullanıcı</span>
+            </div>
+            <nav class="menu">
+                <a href="#"><i data-lucide="home"></i><span>Anasayfa</span></a>
+                <a href="#"><i data-lucide="video"></i><span>Videolar</span></a>
+                <a href="#"><i data-lucide="camera"></i><span>Kameralar</span></a>
+                <a href="#"><i data-lucide="settings"></i><span>Ayarlar</span></a>
+            </nav>
+        </aside>
+        <div class="content">
+            <header class="topbar">
+                <button id="sidebarToggle" class="toggle-btn"><i data-lucide="menu"></i></button>
+                <h1>Dashboard</h1>
+            </header>
+            <section class="main">
+                <p>Hoş geldiniz!</p>
+            </section>
+        </div>
+    </div>
+    <script src="/static/dashboard.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
