@@ -10,7 +10,6 @@ class PiEkranController {
             statusIndicator: document.getElementById('statusIndicator'),
             statusText: document.getElementById('statusText'),
             playVideoBtn: document.getElementById('playVideoBtn'),
-            playCameraBtn: document.getElementById('playCameraBtn'),
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
             uploadInput: document.getElementById('uploadInput'),
@@ -42,7 +41,6 @@ class PiEkranController {
     
     bindEvents() {
         this.elements.playVideoBtn.addEventListener('click', () => this.playVideo());
-        this.elements.playCameraBtn.addEventListener('click', () => this.playCamera());
         this.elements.playSlideshowBtn.addEventListener('click', () => this.playSlideshow());
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
@@ -114,7 +112,6 @@ class PiEkranController {
     updateButtons(status) {
         if (!this.isProcessing) {
             this.elements.playVideoBtn.disabled = false;
-            this.elements.playCameraBtn.disabled = false;
             this.elements.playSlideshowBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
@@ -123,7 +120,6 @@ class PiEkranController {
             
             // Buton durumlarını güncelle
             this.elements.playVideoBtn.classList.remove('loading');
-            this.elements.playCameraBtn.classList.remove('loading');
             this.elements.stopBtn.classList.remove('loading');
             this.elements.announceBtn.classList.remove('loading');
         }
@@ -166,7 +162,6 @@ class PiEkranController {
         
         this.isProcessing = true;
         this.disableAllButtons();
-        this.elements.playCameraBtn.classList.add('loading');
         this.addLog('Kamera yayını isteği gönderiliyor...');
         
         try {
@@ -183,7 +178,6 @@ class PiEkranController {
             this.handleError('Kamera yayını hatası');
         } finally {
             this.isProcessing = false;
-            this.elements.playCameraBtn.classList.remove('loading');
         }
     }
 
@@ -363,7 +357,6 @@ class PiEkranController {
     }
     disableAllButtons() {
         this.elements.playVideoBtn.disabled = true;
-        this.elements.playCameraBtn.disabled = true;
         this.elements.playSlideshowBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
         this.elements.announceBtn.disabled = true;
