@@ -89,9 +89,25 @@
                     <p>Sistem durumu ve kontrol merkezi</p>
                 </div>
                 
-                <div class="status-indicator" id="statusIndicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text" id="statusText">Bağlanıyor...</span>
+                <div class="topbar-actions">
+                    <div class="system-status-widget" id="systemStatusWidget">
+                        <div class="status-item cpu">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                            <span id="cpuUsageWidget">--%</span>
+                        </div>
+                        <div class="status-item ram">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 13h2M2 9h2M20 13h2M20 9h2M5 21V3h14v18H5zM12 17v-2"></path></svg>
+                            <span id="ramUsageWidget">--%</span>
+                        </div>
+                        <div class="status-item temp">
+                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z"></path></svg>
+                            <span id="tempWidget">--°C</span>
+                        </div>
+                    </div>
+                    <div class="status-indicator" id="statusIndicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text" id="statusText">Bağlanıyor...</span>
+                    </div>
                 </div>
             </header>
 
@@ -154,6 +170,11 @@
                                     </svg>
                                     Görsel Ekle
                                 </label>
+                            </div>
+
+                            <!-- Image List -->
+                            <div class="image-list" id="imageList">
+                                <!-- Images will be loaded here dynamically -->
                             </div>
                             
                             <!-- Control Buttons -->
@@ -383,6 +404,19 @@
                         <span>Slayt Gösterisini Başlat</span>
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer Modal -->
+    <div id="logModal" class="modal">
+        <div class="modal-content log-modal-content">
+            <div class="modal-header">
+                <h3>Sistem Logları</h3>
+                <button class="close" id="closeLogModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="logContent" class="log-container"></pre>
             </div>
         </div>
     </div>

@@ -9,7 +9,7 @@ import json
 import subprocess
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -18,6 +18,7 @@ import socket
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
+import psutil
 
 # Uygulama dizini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -149,7 +150,7 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop=inf'] + video_paths
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + ['--input-ipc-server=/tmp/mpvsocket', '--loop-playlist=inf'] + video_paths
                 
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
@@ -221,7 +222,7 @@ class MediaPlayer:
 
         with self.lock:
             try:
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + [f'--image-display-duration={interval}', '--loop=inf'] + image_paths
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + [f'--image-display-duration={interval}', '--loop-playlist=inf'] + image_paths
                 self.current_process = subprocess.Popen(cmd)
                 self.current_source = 'slayt'
                 logger.info(f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_paths)}")
@@ -444,6 +445,45 @@ def upload_image():
             
     return jsonify({'success': True, 'message': 'Görseller yüklendi'})
 
+@app.route('/delete_video', methods=['POST'])
+def delete_video():
+    """Video sil"""
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename')
+    if not filename:
+        return jsonify({'success': False, 'message': 'Dosya adı belirtilmedi'})
+    
+    try:
+        filepath = os.path.join(VIDEO_DIR, secure_filename(filename))
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            logger.info(f"Video silindi: {filename}")
+            return jsonify({'success': True, 'message': 'Video başarıyla silindi'})
+        else:
+            return jsonify({'success': False, 'message': 'Dosya bulunamadı'})
+    except Exception as e:
+        logger.error(f"Video silinirken hata: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/delete_image', methods=['POST'])
+def delete_image():
+    """Görsel sil"""
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename')
+    if not filename:
+        return jsonify({'success': False, 'message': 'Dosya adı belirtilmedi'})
+        
+    try:
+        filepath = os.path.join(IMAGE_DIR, secure_filename(filename))
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            logger.info(f"Görsel silindi: {filename}")
+            return jsonify({'success': True, 'message': 'Görsel başarıyla silindi'})
+        else:
+            return jsonify({'success': False, 'message': 'Dosya bulunamadı'})
+    except Exception as e:
+        logger.error(f"Görsel silinirken hata: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/cameras', methods=['GET', 'POST', 'DELETE'])
 def cameras():
@@ -502,8 +542,61 @@ def system_info():
     except Exception:
         logger.warning("Disk bilgisi okunamadı.")
 
-    return jsonify({'temperature': temp, 'disk_usage': disk})
+    try:
+        mem = psutil.virtual_memory()
+        mem_percent = mem.percent
+        mem_total = f"{mem.total / (1024**3):.2f} GB"
+        mem_used = f"{mem.used / (1024**3):.2f} GB"
+    except Exception as e:
+        logger.warning(f"Hafıza bilgisi okunamadı: {e}")
+        mem_percent, mem_total, mem_used = 'N/A', 'N/A', 'N/A'
 
+    try:
+        cpu = psutil.cpu_percent(interval=1)
+    except Exception as e:
+        logger.warning(f"İşlemci kullanımı okunamadı: {e}")
+        cpu = 'N/A'
+
+    try:
+        boot_time = datetime.fromtimestamp(psutil.boot_time())
+        uptime = str(datetime.now() - boot_time).split('.')[0]
+    except Exception as e:
+        logger.warning(f"Çalışma süresi okunamadı: {e}")
+        uptime = 'N/A'
+
+    return jsonify({
+        'temperature': temp,
+        'disk_usage': disk,
+        'cpu_usage': cpu,
+        'memory': {
+            'percent': mem_percent,
+            'total': mem_total,
+            'used': mem_used
+        },
+        'uptime': uptime
+    })
+
+@app.route('/logs')
+def logs():
+    """Logları getir"""
+    try:
+        log_files = sorted(
+            [os.path.join(LOG_DIR, f) for f in os.listdir(LOG_DIR)],
+            key=os.path.getmtime,
+            reverse=True
+        )
+        if not log_files:
+            return jsonify({'success': False, 'logs': 'Log dosyası bulunamadı'})
+
+        with open(log_files[0], 'r', encoding='utf-8') as f:
+            # Son 100 satırı oku
+            lines = f.readlines()
+            last_100_lines = lines[-100:]
+        
+        return jsonify({'success': True, 'logs': ''.join(last_100_lines)})
+    except Exception as e:
+        logger.error(f"Loglar okunurken hata: {e}")
+        return jsonify({'success': False, 'logs': str(e)})
 
 def discover_onvif_cameras():
     """ONVIF kameralarını keşfet"""

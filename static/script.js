@@ -61,6 +61,9 @@ class PiEkranController {
 
         // Kameraları yükle
         this.loadCameras();
+
+        // Görselleri yükle
+        this.loadImages();
     }
     
     bindEvents() {
@@ -355,14 +358,24 @@ class PiEkranController {
     renderVideoList(list) {
         this.elements.videoList.innerHTML = '';
         list.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'video-item';
+
             const label = document.createElement('label');
-            label.className = 'video-item';
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.value = name;
             label.appendChild(cb);
             label.appendChild(document.createTextNode(' ' + name));
-            this.elements.videoList.appendChild(label);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.onclick = () => this.deleteVideo(name);
+
+            item.appendChild(label);
+            item.appendChild(deleteBtn);
+            this.elements.videoList.appendChild(item);
         });
     }
 
@@ -616,8 +629,88 @@ class PiEkranController {
         await this.loadSlideshowImages();
     }
 
+    async deleteVideo(filename) {
+        if (!confirm(`'${filename}' adlı videoyu silmek istediğinizden emin misiniz?`)) return;
+
+        try {
+            const response = await fetch('/delete_video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Video başarıyla silindi', 'success');
+                this.loadVideos(); // Listeyi yenile
+            } else {
+                this.addLog(`Hata: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.handleError('Video silme hatası');
+        }
+    }
+
+    async deleteImage(filename) {
+        if (!confirm(`'${filename}' adlı görseli silmek istediğinizden emin misiniz?`)) return;
+
+        try {
+            const response = await fetch('/delete_image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Görsel başarıyla silindi', 'success');
+                this.loadImages(); // Listeyi yenile
+            } else {
+                this.addLog(`Hata: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.handleError('Görsel silme hatası');
+        }
+    }
+
     closeSlideshowModal() {
         this.elements.slideshowModal.classList.remove('show');
+    }
+
+    async loadImages() {
+        try {
+            const response = await fetch('/images');
+            const data = await response.json();
+            this.renderImageList(data.images || []);
+        } catch (e) {
+            this.addLog('Görsel listesi alınamadı', 'error');
+        }
+    }
+
+    renderImageList(images) {
+        const imageListContainer = document.getElementById('imageList');
+        if (!imageListContainer) return;
+
+        imageListContainer.innerHTML = '';
+        images.forEach(image => {
+            const item = document.createElement('div');
+            item.className = 'image-item';
+
+            const img = document.createElement('img');
+            img.src = `/images/${image}`;
+            img.alt = image;
+
+            const name = document.createElement('span');
+            name.textContent = image;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.onclick = () => this.deleteImage(image);
+
+            item.appendChild(img);
+            item.appendChild(name);
+            item.appendChild(deleteBtn);
+            imageListContainer.appendChild(item);
+        });
     }
 
     async loadSlideshowImages() {
