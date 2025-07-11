@@ -5,160 +5,288 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eform Spor Merkezi TV Kontrol Paneli</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Eform Spor Merkezi TV Kontrol Paneli</h1>
-            <div class="status-indicator" id="statusIndicator">
-                <span class="status-dot"></span>
-                <span class="status-text" id="statusText">Bağlanıyor...</span>
+    <div class="app-container">
+        <!-- Main Header -->
+        <header class="main-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">E</div>
+                    <div>
+                        <h1 class="app-title">Eform Spor Merkezi</h1>
+                        <p class="app-subtitle">TV Kontrol Paneli</p>
+                    </div>
+                </div>
+                
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text" id="statusText">Bağlanıyor...</span>
+                </div>
             </div>
         </header>
 
+        <!-- Navigation -->
         <nav class="main-nav">
-            <ul>
-                <li><a href="#control">Kontrol</a></li>
-                <li><a href="#info">Sistem Bilgileri</a></li>
-                <li><a href="#logs">İşlem Geçmişi</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
-            </ul>
+            <div class="nav-content">
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="#control" class="nav-link active" data-section="control">
+                            <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                            </svg>
+                            Kontrol
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#info" class="nav-link" data-section="info">
+                            <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4m0-4h.01"/>
+                            </svg>
+                            Sistem Bilgileri
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#logs" class="nav-link" data-section="logs">
+                            <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14,2 14,8 20,8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                <polyline points="10,9 9,9 8,9"/>
+                            </svg>
+                            İşlem Geçmişi
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/dashboard" class="nav-link">
+                            <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            </svg>
+                            Dashboard
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </nav>
 
-        <main>
-            <div class="control-section" id="control">
-                <h2>Ekran Kontrolü</h2>
-                <div id="videoList" class="video-list"></div>
-                
-                <!-- Kamera Kontrol Alanı -->
-                <div class="camera-control-area">
-                    <div class="camera-list" id="cameraList"></div>
-                    <button class="control-button settings-button" id="cameraSettingsBtn">
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-                        </svg>
-                        <span>Kamera Ayarları</span>
-                    </button>
-                </div>
-                <div class="upload-area">
-                    <input type="file" id="uploadInput" accept="video/mp4">
-                    <button class="control-button" id="uploadBtn">Video Yükle</button>
-                </div>
-                
-                <div class="button-grid">
-                    <button class="control-button video-button" id="playVideoBtn" disabled>
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                        </svg>
-                        <span>Seçilen Videoları Oynat</span>
-                    </button>
-
-                    <button class="control-button slideshow-button" id="playSlideshowBtn" disabled>
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M21.58,16.09L17.17,11.68L7,21.85L2.59,17.44L0,20.03L7,27.03L24.17,9.86L21.58,16.09Z" />
-                        </svg>
-                        <span>Slayt Gösterisi Başlat</span>
-                    </button>
-
-                    <button class="control-button stop-button" id="stopBtn" disabled>
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M18 18H6V6h12v12z"/>
-                        </svg>
-                        <span>Durdur</span>
-                    </button>
-                    <button class="control-button announce-button" id="announceBtn" disabled>
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M12 2L2 7h3v7l7 5 7-5V7h3L12 2z"/>
-                        </svg>
-                        <span>Duyuru Yap</span>
-                    </button>
-                    <button class="control-button" id="resumeBtn" disabled>Otomasyonu Devam Ettir</button>
-                </div>
-            </div>
-
-            <div class="info-section" id="info">
-                <h3>Sistem Bilgileri</h3>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Mevcut Kaynak:</span>
-                        <span class="info-value" id="currentSource">-</span>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Control Section -->
+            <section class="control-section" id="control">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <svg class="button-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                            Ekran Kontrolü
+                        </h2>
+                        <p class="card-subtitle">Video ve kamera yayınlarını yönetin</p>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">İşlemci Sıcaklığı:</span>
-                        <span class="info-value" id="cpuTemp">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Disk Kullanımı:</span>
-                        <span class="info-value" id="diskUsage">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Son Güncelleme:</span>
-                        <span class="info-value" id="lastUpdate">-</span>
-                    </div>
-                </div>
-            </div>
+                    <div class="card-body">
+                        <!-- Video List -->
+                        <div class="video-list" id="videoList">
+                            <!-- Videos will be loaded here dynamically -->
+                        </div>
+                        
+                        <!-- Camera Control Area -->
+                        <div class="camera-control-area">
+                            <div class="camera-list" id="cameraList">
+                                <!-- Cameras will be loaded here dynamically -->
+                            </div>
+                            <button class="control-button settings-button" id="cameraSettingsBtn">
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                                </svg>
+                                <span>Kamera Ayarları</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Upload Area -->
+                        <div class="upload-area">
+                            <input type="file" id="uploadInput" class="upload-input" accept="video/mp4">
+                            <label for="uploadInput" class="upload-label">
+                                <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7,10 12,15 17,10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Video Yükle
+                            </label>
+                            <button class="control-button" id="uploadBtn" style="display: none;">Video Yükle</button>
+                        </div>
+                        
+                        <!-- Control Buttons -->
+                        <div class="button-grid">
+                            <button class="control-button video-button" id="playVideoBtn" disabled>
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                <span>Seçilen Videoları Oynat</span>
+                            </button>
 
-            <div class="log-section" id="logs">
-                <h3>İşlem Geçmişi</h3>
-                <div class="log-container" id="logContainer">
-                    <p class="log-entry">Sistem başlatıldı...</p>
+                            <button class="control-button slideshow-button" id="playSlideshowBtn" disabled>
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <rect x="3" y="4" width="18" height="12" rx="1" ry="1"/>
+                                    <line x1="7" y1="8" x2="7" y2="12"/>
+                                    <line x1="17" y1="8" x2="17" y2="12"/>
+                                    <line x1="7" y1="20" x2="17" y2="20"/>
+                                </svg>
+                                <span>Slayt Gösterisi Başlat</span>
+                            </button>
+
+                            <button class="control-button stop-button" id="stopBtn" disabled>
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <rect x="6" y="6" width="12" height="12" rx="1" ry="1"/>
+                                </svg>
+                                <span>Durdur</span>
+                            </button>
+
+                            <button class="control-button announce-button" id="announceBtn" disabled>
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M3 11v3a1 1 0 0 0 1 1h1l4 4V7L5 11H4a1 1 0 0 0-1 1z"/>
+                                    <path d="M13.54 3.46a10 10 0 0 1 0 17.08"/>
+                                    <path d="M10.54 6.46a6 6 0 0 1 0 11.08"/>
+                                </svg>
+                                <span>Duyuru Yap</span>
+                            </button>
+
+                            <button class="control-button settings-button" id="resumeBtn" disabled>
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                    <circle cx="12" cy="12" r="10"/>
+                                </svg>
+                                <span>Otomasyonu Devam Ettir</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- System Info Section -->
+            <section class="info-section" id="info" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <svg class="button-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4m0-4h.01"/>
+                            </svg>
+                            Sistem Bilgileri
+                        </h3>
+                        <p class="card-subtitle">Sistem durumu ve performans metrikleri</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Mevcut Kaynak</div>
+                                <div class="info-value" id="currentSource">-</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">İşlemci Sıcaklığı</div>
+                                <div class="info-value" id="cpuTemp">-</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Disk Kullanımı</div>
+                                <div class="info-value" id="diskUsage">-</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Son Güncelleme</div>
+                                <div class="info-value" id="lastUpdate">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Logs Section -->
+            <section class="log-section" id="logs" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <svg class="button-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14,2 14,8 20,8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                            </svg>
+                            İşlem Geçmişi
+                        </h3>
+                        <p class="card-subtitle">Sistem aktiviteleri ve log kayıtları</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="log-container" id="logContainer">
+                            <div class="log-entry">Sistem başlatıldı...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
 
-        <footer>
-            <p>Eform Spor Merkezi TV Kontrol Paneli</p>
+        <!-- Footer -->
+        <footer class="main-footer">
+            <p>&copy; 2025 Eform Spor Merkezi TV Kontrol Paneli - Modern ve Responsive Tasarım</p>
         </footer>
     </div>
 
-    <!-- Kamera Ayarları Modal -->
+    <!-- Camera Settings Modal -->
     <div id="cameraModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Kamera Yönetimi</h3>
-                <span class="close" id="closeModal">&times;</span>
+                <button class="close" id="closeModal">&times;</button>
             </div>
             <div class="modal-body">
-                <!-- Mevcut Kameralar -->
-                <div class="camera-management-section">
-                    <h4>Mevcut Kameralar</h4>
+                <!-- Current Cameras -->
+                <div class="camera-management-section mb-6">
+                    <h4 class="card-title mb-4">Mevcut Kameralar</h4>
                     <div id="modalCameraList" class="modal-camera-list">
-                        <!-- Kameralar buraya yüklenecek -->
+                        <!-- Cameras will be loaded here -->
                     </div>
                 </div>
                 
-                <!-- Otomatik Kamera Keşfi -->
-                <div class="camera-discovery-section">
-                    <h4>Otomatik Kamera Keşfi</h4>
+                <!-- Camera Discovery -->
+                <div class="camera-discovery-section mb-6">
+                    <h4 class="card-title mb-4">Otomatik Kamera Keşfi</h4>
                     <button type="button" id="scanNetworkBtn" class="control-button scan-button">
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
                         </svg>
                         <span id="scanButtonText">Ağı Tara ve Kameraları Bul</span>
                     </button>
                     <div id="scanResults" class="scan-results" style="display: none;">
-                        <h5>Bulunan Kameralar:</h5>
+                        <h5 class="card-title mb-4">Bulunan Kameralar:</h5>
                         <div id="discoveredCameras" class="discovered-cameras">
-                            <!-- Keşfedilen kameralar buraya yüklenecek -->
+                            <!-- Discovered cameras will be loaded here -->
                         </div>
                     </div>
                 </div>
 
-                <!-- Yeni Kamera Ekleme -->
+                <!-- Add Camera Form -->
                 <div class="camera-add-section">
-                    <h4>Manuel Kamera Ekleme</h4>
+                    <h4 class="card-title mb-4">Manuel Kamera Ekleme</h4>
                     <form id="addCameraForm" class="camera-form">
                         <div class="form-group">
-                            <label for="cameraName">Kamera Adı:</label>
-                            <input type="text" id="cameraName" name="name" required placeholder="Örn: Giriş Kamerası">
+                            <label for="cameraName" class="form-label">Kamera Adı:</label>
+                            <input type="text" id="cameraName" name="name" class="form-input" required placeholder="Örn: Giriş Kamerası">
                         </div>
                         <div class="form-group">
-                            <label for="cameraUrl">RTSP URL:</label>
-                            <input type="text" id="cameraUrl" name="url" required placeholder="rtsp://192.168.1.100:554/stream1">
+                            <label for="cameraUrl" class="form-label">RTSP URL:</label>
+                            <input type="text" id="cameraUrl" name="url" class="form-input" required placeholder="rtsp://192.168.1.100:554/stream1">
                         </div>
                         <button type="submit" class="control-button add-button">
-                            <svg class="button-icon" viewBox="0 0 24 24">
-                                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                            <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
                             <span>Kamera Ekle</span>
                         </button>
@@ -169,29 +297,30 @@
     </div>
 
     <!-- Credential Modal for Discovered Cameras -->
-    <div id="credentialModal" class="credential-modal">
-        <div class="credential-modal-content">
-            <div class="credential-modal-header">
+    <div id="credentialModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h4>Kamera Bilgileri</h4>
-                <span class="close" id="closeCredentialModal">&times;</span>
+                <button class="close" id="closeCredentialModal">&times;</button>
             </div>
-            <div class="credential-modal-body">
+            <div class="modal-body">
                 <form id="credentialForm" class="credential-form">
                     <div class="form-group">
-                        <label for="discoveredCameraName">Kamera Adı:</label>
-                        <input type="text" id="discoveredCameraName" name="name" required placeholder="Kamera için bir ad girin">
+                        <label for="discoveredCameraName" class="form-label">Kamera Adı:</label>
+                        <input type="text" id="discoveredCameraName" name="name" class="form-input" required placeholder="Kamera için bir ad girin">
                     </div>
                     <div class="form-group">
-                        <label for="cameraUsername">Kullanıcı Adı:</label>
-                        <input type="text" id="cameraUsername" name="username" required placeholder="admin">
+                        <label for="cameraUsername" class="form-label">Kullanıcı Adı:</label>
+                        <input type="text" id="cameraUsername" name="username" class="form-input" required placeholder="admin">
                     </div>
                     <div class="form-group">
-                        <label for="cameraPassword">Şifre:</label>
-                        <input type="password" id="cameraPassword" name="password" required placeholder="Kamera şifresi">
+                        <label for="cameraPassword" class="form-label">Şifre:</label>
+                        <input type="password" id="cameraPassword" name="password" class="form-input" required placeholder="Kamera şifresi">
                     </div>
                     <button type="submit" class="control-button add-button">
-                        <svg class="button-icon" viewBox="0 0 24 24">
-                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
                         <span>Kamerayı Ekle</span>
                     </button>
@@ -201,5 +330,33 @@
     </div>
 
     <script src="/static/script.js"></script>
+    <script>
+        // Navigation functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link[data-section]');
+            const sections = document.querySelectorAll('section[id]');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Remove active class from all nav links
+                    navLinks.forEach(nl => nl.classList.remove('active'));
+                    
+                    // Add active class to clicked link
+                    this.classList.add('active');
+                    
+                    // Hide all sections
+                    sections.forEach(section => section.style.display = 'none');
+                    
+                    // Show target section
+                    const targetSection = document.getElementById(this.dataset.section);
+                    if (targetSection) {
+                        targetSection.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
