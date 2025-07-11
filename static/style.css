@@ -43,6 +43,28 @@ header {
     align-items: center;
 }
 
+/* Navigation */
+.main-nav {
+    background-color: var(--card-background);
+    padding: 10px 20px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+}
+.main-nav ul {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+}
+.main-nav a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+.main-nav a:hover {
+    color: var(--secondary-color);
+}
+
 h1 {
     color: var(--primary-color);
     font-size: 2rem;
