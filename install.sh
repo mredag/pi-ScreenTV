@@ -57,7 +57,7 @@ python3 -m py_compile app.py
 step "8. Starting service"
 sudo systemctl restart pi-ekran.service
 sleep 2
-sudo systemctl status pi-ekran.service --no-pager
+sudo systemctl status pi-ekran.service --no-pager || true
 
 IP=$(hostname -I | awk '{print $1}')
 echo -e "${GREEN}Installation complete. Access the web interface at: http://${IP}:5000${NC}"
