@@ -1,0 +1,41 @@
+# Python sanal ortamları
+venv/
+env/
+.venv/
+.env/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE / Editor ayarları
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# MacOS/Windows sistem dosyaları
+.DS_Store
+Thumbs.db
+
+# Log ve geçici dosyalar
+*.log
+*.tmp
+
+# Kişisel config dosyaları (isteğe bağlı)
+config.json
+
+# Diğer yaygın örnekler
+*.sqlite3
+*.db
+
+# Test coverage
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# Pip wheel cache
+*.whl
+pip-wheel-metadata/
