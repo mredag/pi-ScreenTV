@@ -12,6 +12,7 @@ bash install.sh
 ```
 
 Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://pi-ekran.local:5000` adresinden erişebilirsiniz.
+Yeni yan menülü gösterge panelini kullanmak için `http://pi-ekran.local:5000/dashboard` adresine gidin.
 
 ### Güncelleme
 
@@ -81,7 +82,7 @@ cd ~/pi-ekran
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install flask
+pip install -r requirements.txt
 ```
 
 ### 6. Test Video ve Kamera Kontrolü
