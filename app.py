@@ -315,6 +315,11 @@ def index():
     """Ana sayfa"""
     return render_template('index.html')
 
+@app.route('/dashboard')
+def dashboard():
+    """Gelişmiş kontrol paneli"""
+    return render_template('dashboard.html')
+
 @app.route('/status')
 def status():
     """Sistem durumu"""
