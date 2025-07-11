@@ -16,8 +16,16 @@
             </div>
         </header>
 
+        <nav class="main-nav">
+            <ul>
+                <li><a href="#control">Kontrol</a></li>
+                <li><a href="#info">Sistem Bilgileri</a></li>
+                <li><a href="#logs">İşlem Geçmişi</a></li>
+            </ul>
+        </nav>
+
         <main>
-            <div class="control-section">
+            <div class="control-section" id="control">
                 <h2>Ekran Kontrolü</h2>
                 <div id="videoList" class="video-list"></div>
                 <div class="camera-list" id="cameraList"></div>
@@ -64,7 +72,7 @@
                 </div>
             </div>
 
-            <div class="info-section">
+            <div class="info-section" id="info">
                 <h3>Sistem Bilgileri</h3>
                 <div class="info-grid">
                     <div class="info-item">
@@ -86,7 +94,7 @@
                 </div>
             </div>
 
-            <div class="log-section">
+            <div class="log-section" id="logs">
                 <h3>İşlem Geçmişi</h3>
                 <div class="log-container" id="logContainer">
                     <p class="log-entry">Sistem başlatıldı...</p>
