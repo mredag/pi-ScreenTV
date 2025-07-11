@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Eform Spor Merkezi TV Kontrol Paneli</title>
+    <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/dashboard.css">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -15,23 +16,106 @@
                 <span class="username">Kullanıcı</span>
             </div>
             <nav class="menu">
-                <a href="#"><i data-lucide="home"></i><span>Anasayfa</span></a>
-                <a href="#"><i data-lucide="video"></i><span>Videolar</span></a>
-                <a href="#"><i data-lucide="camera"></i><span>Kameralar</span></a>
-                <a href="#"><i data-lucide="settings"></i><span>Ayarlar</span></a>
+                <a href="#control"><i data-lucide="sliders"></i><span>Kontrol</span></a>
+                <a href="#info"><i data-lucide="info"></i><span>Sistem Bilgileri</span></a>
+                <a href="#logs"><i data-lucide="list"></i><span>İşlem Geçmişi</span></a>
             </nav>
         </aside>
         <div class="content">
-            <header class="topbar">
-                <button id="sidebarToggle" class="toggle-btn"><i data-lucide="menu"></i></button>
-                <h1>Dashboard</h1>
-            </header>
-            <section class="main">
-                <p>Hoş geldiniz!</p>
-            </section>
+        <header class="topbar">
+            <button id="sidebarToggle" class="toggle-btn"><i data-lucide="menu"></i></button>
+            <h1>Eform Spor Merkezi TV Kontrol Paneli</h1>
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span class="status-text" id="statusText">Bağlanıyor...</span>
+            </div>
+        </header>
+        <main class="main">
+            <div class="container">
+                <div class="control-section" id="control">
+                    <h2>Ekran Kontrolü</h2>
+                    <div id="videoList" class="video-list"></div>
+                    <div class="camera-list" id="cameraList"></div>
+                    <div class="upload-area">
+                        <input type="file" id="uploadInput" accept="video/mp4">
+                        <button class="control-button" id="uploadBtn">Video Yükle</button>
+                    </div>
+
+                    <div class="button-grid">
+                        <button class="control-button video-button" id="playVideoBtn" disabled>
+                            <svg class="button-icon" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            <span>Seçilen Videoları Oynat</span>
+                        </button>
+
+                        <button class="control-button camera-button" id="playCameraBtn" disabled>
+                            <svg class="button-icon" viewBox="0 0 24 24">
+                                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m-7-13.5L9 6H15l4-4h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h2z"/>
+                            </svg>
+                            <span>Kamerayı Göster</span>
+                        </button>
+
+                        <button class="control-button slideshow-button" id="playSlideshowBtn" disabled>
+                            <svg class="button-icon" viewBox="0 0 24 24">
+                                <path d="M21.58,16.09L17.17,11.68L7,21.85L2.59,17.44L0,20.03L7,27.03L24.17,9.86L21.58,16.09Z" />
+                            </svg>
+                            <span>Slayt Gösterisi Başlat</span>
+                        </button>
+
+                        <button class="control-button stop-button" id="stopBtn" disabled>
+                            <svg class="button-icon" viewBox="0 0 24 24">
+                                <path d="M18 18H6V6h12v12z"/>
+                            </svg>
+                            <span>Durdur</span>
+                        </button>
+                        <button class="control-button announce-button" id="announceBtn" disabled>
+                            <svg class="button-icon" viewBox="0 0 24 24">
+                                <path d="M12 2L2 7h3v7l7 5 7-5V7h3L12 2z"/>
+                            </svg>
+                            <span>Duyuru Yap</span>
+                        </button>
+                        <button class="control-button" id="resumeBtn" disabled>Otomasyonu Devam Ettir</button>
+                    </div>
+                </div>
+
+                <div class="info-section" id="info">
+                    <h3>Sistem Bilgileri</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Mevcut Kaynak:</span>
+                            <span class="info-value" id="currentSource">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">İşlemci Sıcaklığı:</span>
+                            <span class="info-value" id="cpuTemp">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Disk Kullanımı:</span>
+                            <span class="info-value" id="diskUsage">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Son Güncelleme:</span>
+                            <span class="info-value" id="lastUpdate">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="log-section" id="logs">
+                    <h3>İşlem Geçmişi</h3>
+                    <div class="log-container" id="logContainer">
+                        <p class="log-entry">Sistem başlatıldı...</p>
+                    </div>
+                </div>
+                <footer>
+                    <p>Eform Spor Merkezi TV Kontrol Paneli</p>
+                </footer>
+            </div>
+        </main>
         </div>
     </div>
     <script src="/static/dashboard.js"></script>
     <script>lucide.createIcons();</script>
-</body>
+    <script src="/static/script.js"></script>
+  </body>
 </html>
