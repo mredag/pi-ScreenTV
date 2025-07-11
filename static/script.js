@@ -13,7 +13,7 @@ class PiEkranController {
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
             uploadInput: document.getElementById('uploadInput'),
-            uploadBtn: document.getElementById('uploadBtn'),
+            imageUploadInput: document.getElementById('imageUploadInput'),
             resumeBtn: document.getElementById('resumeBtn'),
             cameraList: document.getElementById('cameraList'),
             videoList: document.getElementById('videoList'),
@@ -39,7 +39,11 @@ class PiEkranController {
             credentialForm: document.getElementById('credentialForm'),
             discoveredCameraName: document.getElementById('discoveredCameraName'),
             cameraUsername: document.getElementById('cameraUsername'),
-            cameraPassword: document.getElementById('cameraPassword')
+            cameraPassword: document.getElementById('cameraPassword'),
+            slideshowModal: document.getElementById('slideshowModal'),
+            closeSlideshowModal: document.getElementById('closeSlideshowModal'),
+            slideshowForm: document.getElementById('slideshowForm'),
+            slideshowImageList: document.getElementById('slideshowImageList'),
         };
         
         // Event listener'ları ekle
@@ -61,10 +65,11 @@ class PiEkranController {
     
     bindEvents() {
         this.elements.playVideoBtn.addEventListener('click', () => this.playVideo());
-        this.elements.playSlideshowBtn.addEventListener('click', () => this.playSlideshow());
+        this.elements.playSlideshowBtn.addEventListener('click', () => this.openSlideshowModal());
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
-        this.elements.uploadBtn.addEventListener('click', () => this.upload());
+        this.elements.uploadInput.addEventListener('change', () => this.uploadVideo());
+        this.elements.imageUploadInput.addEventListener('change', () => this.uploadImage());
         this.elements.resumeBtn.addEventListener('click', () => this.resume());
         
         // Modal event listeners
@@ -75,6 +80,15 @@ class PiEkranController {
                 this.closeCameraModal();
             }
         });
+
+        // Slideshow modal event listeners
+        this.elements.closeSlideshowModal.addEventListener('click', () => this.closeSlideshowModal());
+        this.elements.slideshowModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.slideshowModal) {
+                this.closeSlideshowModal();
+            }
+        });
+        this.elements.slideshowForm.addEventListener('submit', (e) => this.handleSlideshowForm(e));
         
         // Form event listeners
         this.elements.addCameraForm.addEventListener('submit', (e) => this.addCamera(e));
@@ -98,6 +112,8 @@ class PiEkranController {
                     this.closeCredentialModal();
                 } else if (this.elements.cameraModal.classList.contains('show')) {
                     this.closeCameraModal();
+                } else if (this.elements.slideshowModal.classList.contains('show')) {
+                    this.closeSlideshowModal();
                 }
             }
         });
@@ -170,7 +186,6 @@ class PiEkranController {
             this.elements.playSlideshowBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
-            this.elements.uploadBtn.disabled = false;
             this.elements.resumeBtn.disabled = !status.automation_paused;
             
             // Buton durumlarını güncelle
@@ -261,7 +276,7 @@ class PiEkranController {
         }
     }
 
-    async playSlideshow() {
+    async playSlideshow(images, interval) {
         if (this.isProcessing) return;
         this.isProcessing = true;
         this.disableAllButtons();
@@ -269,11 +284,16 @@ class PiEkranController {
         this.addLog('Slayt gösterisi isteği gönderiliyor...');
 
         try {
-            const response = await fetch('/play_slideshow', { method: 'POST' });
+            const response = await fetch('/play_slideshow', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({images: images, interval: interval})
+            });
             const data = await response.json();
             if (data.success) {
                 this.addLog('Slayt gösterisi başarıyla başlatıldı', 'success');
                 this.updateUI(data.status);
+                this.closeSlideshowModal();
             } else {
                 this.addLog(`Hata: ${data.message}`, 'error');
             }
@@ -357,27 +377,64 @@ class PiEkranController {
         });
     }
 
-    async upload() {
-        const file = this.elements.uploadInput.files[0];
-        if (!file) return;
-        const form = new FormData();
-        form.append('file', file);
+    async uploadVideo() {
+        const files = this.elements.uploadInput.files;
+        if (files.length === 0) return;
+
         this.isProcessing = true;
         this.disableAllButtons();
+        this.addLog(`${files.length} video yükleniyor...`);
+
+        const formData = new FormData();
+        for (const file of files) {
+            formData.append('files[]', file);
+        }
+
         try {
-            const res = await fetch('/upload', {method: 'POST', body: form});
+            const res = await fetch('/upload', {method: 'POST', body: formData});
             const data = await res.json();
             if (data.success) {
-                this.addLog('Video yüklendi', 'success');
+                this.addLog('Video(lar) başarıyla yüklendi', 'success');
                 this.loadVideos();
             } else {
-                this.addLog('Yükleme hatası', 'error');
+                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
             }
         } catch (e) {
-            this.addLog('Yükleme hatası', 'error');
+            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
         } finally {
             this.isProcessing = false;
             this.updateButtons({playing:false});
+            this.elements.uploadInput.value = ''; // Reset file input
+        }
+    }
+
+    async uploadImage() {
+        const files = this.elements.imageUploadInput.files;
+        if (files.length === 0) return;
+
+        this.isProcessing = true;
+        this.disableAllButtons();
+        this.addLog(`${files.length} görsel yükleniyor...`);
+
+        const formData = new FormData();
+        for (const file of files) {
+            formData.append('files[]', file);
+        }
+
+        try {
+            const res = await fetch('/upload_image', {method: 'POST', body: formData});
+            const data = await res.json();
+            if (data.success) {
+                this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
+            } else {
+                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+        } finally {
+            this.isProcessing = false;
+            this.updateButtons({playing:false});
+            this.elements.imageUploadInput.value = ''; // Reset file input
         }
     }
 
@@ -425,7 +482,6 @@ class PiEkranController {
         this.elements.playSlideshowBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
         this.elements.announceBtn.disabled = true;
-        this.elements.uploadBtn.disabled = true;
         this.elements.resumeBtn.disabled = true;
     }
     
@@ -508,19 +564,9 @@ class PiEkranController {
 
     async addCamera(event) {
         event.preventDefault();
-        
-        if (this.isProcessing) return;
-        
-        const name = this.elements.cameraName.value.trim();
-        const url = this.elements.cameraUrl.value.trim();
-        
-        if (!name || !url) {
-            this.addLog('Kamera adı ve URL gerekli', 'error');
-            return;
-        }
-
-        this.isProcessing = true;
-        this.addLog('Yeni kamera ekleniyor...');
+        const name = this.elements.cameraName.value;
+        const url = this.elements.cameraUrl.value;
+        if (!name || !url) return;
 
         try {
             const response = await fetch('/cameras', {
@@ -528,34 +574,22 @@ class PiEkranController {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name, url})
             });
-            
             const data = await response.json();
-            
             if (data.success) {
-                this.addLog(`Kamera "${name}" başarıyla eklendi`, 'success');
-                this.elements.addCameraForm.reset();
+                this.addLog('Kamera eklendi', 'success');
                 this.loadModalCameras();
-                this.loadCameras(); // Ana listeyi de güncelle
+                this.loadCameras();
+                this.elements.addCameraForm.reset();
             } else {
-                this.addLog('Kamera eklenirken hata oluştu', 'error');
+                this.addLog('Kamera eklenemedi', 'error');
             }
-        } catch (error) {
-            this.addLog('Kamera ekleme hatası', 'error');
-        } finally {
-            this.isProcessing = false;
+        } catch (e) {
+            this.addLog('Kamera eklenirken hata', 'error');
         }
     }
 
     async deleteCamera(name) {
-        if (this.isProcessing) return;
-        
-        // Silme onayı
-        if (!confirm(`"${name}" kamerasını silmek istediğinizden emin misiniz?`)) {
-            return;
-        }
-
-        this.isProcessing = true;
-        this.addLog(`Kamera "${name}" siliniyor...`);
+        if (!confirm(`'${name}' adlı kamerayı silmek istediğinizden emin misiniz?`)) return;
 
         try {
             const response = await fetch('/cameras', {
@@ -563,155 +597,70 @@ class PiEkranController {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name})
             });
-            
             const data = await response.json();
-            
             if (data.success) {
-                this.addLog(`Kamera "${name}" başarıyla silindi`, 'success');
+                this.addLog('Kamera silindi', 'success');
                 this.loadModalCameras();
-                this.loadCameras(); // Ana listeyi de güncelle
+                this.loadCameras();
             } else {
-                this.addLog('Kamera silinirken hata oluştu', 'error');
+                this.addLog('Kamera silinemedi', 'error');
             }
-        } catch (error) {
-            this.addLog('Kamera silme hatası', 'error');
-        } finally {
-            this.isProcessing = false;
+        } catch (e) {
+            this.addLog('Kamera silinirken hata', 'error');
         }
     }
 
-    // Network Scanning Methods
-    async scanNetwork() {
-        if (this.isProcessing) return;
-        
-        this.isProcessing = true;
-        this.elements.scanNetworkBtn.classList.add('scanning');
-        this.elements.scanButtonText.textContent = 'Ağ taranıyor...';
-        this.elements.scanResults.style.display = 'block';
-        this.elements.discoveredCameras.innerHTML = '<div class="scanning-message">Ağdaki kameralar aranıyor, lütfen bekleyin...</div>';
-        
-        this.addLog('Ağ taraması başlatıldı...');
+    // Slideshow Modal Methods
+    async openSlideshowModal() {
+        this.elements.slideshowModal.classList.add('show');
+        await this.loadSlideshowImages();
+    }
 
+    closeSlideshowModal() {
+        this.elements.slideshowModal.classList.remove('show');
+    }
+
+    async loadSlideshowImages() {
         try {
-            const response = await fetch('/discover_cameras', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'}
-            });
-            
+            const response = await fetch('/images');
             const data = await response.json();
-            
-            if (data.success) {
-                this.addLog(`${data.cameras.length} kamera bulundu`, 'success');
-                this.renderDiscoveredCameras(data.cameras);
-            } else {
-                this.addLog('Kamera taraması başarısız: ' + data.message, 'error');
-                this.elements.discoveredCameras.innerHTML = '<div class="no-cameras-found">Tarama sırasında hata oluştu</div>';
-            }
-        } catch (error) {
-            this.addLog('Ağ tarama hatası', 'error');
-            this.elements.discoveredCameras.innerHTML = '<div class="no-cameras-found">Ağ taraması başarısız</div>';
-        } finally {
-            this.isProcessing = false;
-            this.elements.scanNetworkBtn.classList.remove('scanning');
-            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
+            this.renderSlideshowImageList(data.images || []);
+        } catch (e) {
+            this.addLog('Görsel listesi alınamadı', 'error');
         }
     }
 
-    renderDiscoveredCameras(cameras) {
-        if (cameras.length === 0) {
-            this.elements.discoveredCameras.innerHTML = '<div class="no-cameras-found">Ağda kamera bulunamadı</div>';
+    renderSlideshowImageList(images) {
+        this.elements.slideshowImageList.innerHTML = '';
+        if (images.length === 0) {
+            this.elements.slideshowImageList.innerHTML = '<p>Slayt gösterisi için hiç görsel bulunamadı.</p>';
             return;
         }
-
-        this.elements.discoveredCameras.innerHTML = '';
-        cameras.forEach(camera => {
-            const cameraItem = document.createElement('div');
-            cameraItem.className = 'discovered-camera-item';
-            cameraItem.innerHTML = `
-                <div class="discovered-camera-info">
-                    <h6>${camera.name || 'Bilinmeyen Kamera'}</h6>
-                    <p>IP: ${camera.ip}</p>
-                    <p>Port: ${camera.port || 80}</p>
-                </div>
-                <button class="add-discovered-btn" onclick="piEkran.showCredentialModal('${camera.ip}', ${camera.port || 80})">
-                    + Ekle
-                </button>
-            `;
-            this.elements.discoveredCameras.appendChild(cameraItem);
+        images.forEach(image => {
+            const label = document.createElement('label');
+            label.className = 'video-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = image;
+            cb.checked = true;
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(' ' + image));
+            this.elements.slideshowImageList.appendChild(label);
         });
     }
 
-    // Credential Modal Methods
-    showCredentialModal(ip, port) {
-        this.currentDiscoveredCamera = { ip, port };
-        this.elements.credentialModal.classList.add('show');
-        this.elements.discoveredCameraName.value = `Kamera ${ip}`;
-        this.elements.cameraUsername.value = 'admin';
-        this.elements.cameraPassword.value = '';
-        this.elements.discoveredCameraName.focus();
-    }
-
-    closeCredentialModal() {
-        this.elements.credentialModal.classList.remove('show');
-        this.elements.credentialForm.reset();
-        this.currentDiscoveredCamera = null;
-    }
-
-    async addDiscoveredCamera(event) {
+    handleSlideshowForm(event) {
         event.preventDefault();
-        
-        if (this.isProcessing || !this.currentDiscoveredCamera) return;
-        
-        const name = this.elements.discoveredCameraName.value.trim();
-        const username = this.elements.cameraUsername.value.trim();
-        const password = this.elements.cameraPassword.value.trim();
-        
-        if (!name || !username || !password) {
-            this.addLog('Tüm alanları doldurun', 'error');
-            return;
-        }
+        const selectedImages = Array.from(this.elements.slideshowImageList.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+        const interval = this.elements.slideshowForm.querySelector('#slideshowInterval').value;
 
-        this.isProcessing = true;
-        this.addLog('Keşfedilen kamera ekleniyor...');
-
-        try {
-            // ONVIF kameralar için RTSP URL'sini oluştur
-            const url = `rtsp://${username}:${password}@${this.currentDiscoveredCamera.ip}:554/stream1`;
-            
-            const response = await fetch('/cameras', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    name,
-                    url,
-                    username,
-                    password,
-                    ip: this.currentDiscoveredCamera.ip,
-                    port: this.currentDiscoveredCamera.port,
-                    discovered: true
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.addLog(`Kamera "${name}" başarıyla eklendi`, 'success');
-                this.closeCredentialModal();
-                this.loadModalCameras();
-                this.loadCameras(); // Ana listeyi de güncelle
-            } else {
-                this.addLog('Kamera eklenirken hata oluştu', 'error');
-            }
-        } catch (error) {
-            this.addLog('Kamera ekleme hatası', 'error');
-        } finally {
-            this.isProcessing = false;
+        if (selectedImages.length > 0) {
+            this.playSlideshow(selectedImages, interval);
+        } else {
+            this.addLog('Lütfen slayt gösterisi için en az bir görsel seçin.', 'warning');
         }
     }
 }
 
-// Sayfa yüklendiğinde kontrolcüyü başlat
-document.addEventListener('DOMContentLoaded', () => {
-    window.piEkran = new PiEkranController();
-});
-
+const piEkran = new PiEkranController();

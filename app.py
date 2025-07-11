@@ -17,6 +17,7 @@ import signal
 import socket
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from werkzeug.utils import secure_filename
 
 # Uygulama dizini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +36,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, f'pi-ekran_{datetime.now().strftime("%Y%m%d")}.log')),
+        logging.FileHandler(os.path.join(LOG_DIR, f'pi-ekran_{datetime.now().strftime("%Y%m%d")}.log'), encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -43,6 +44,8 @@ logger = logging.getLogger('PiEkran')
 
 # Flask uygulaması
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = VIDEO_DIR
+app.config['IMAGE_UPLOAD_FOLDER'] = IMAGE_DIR
 
 class MediaPlayer:
     """MPV media player kontrolcüsü"""
@@ -88,6 +91,12 @@ class MediaPlayer:
     def get_video_files(self):
         try:
             return [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith('.mp4')]
+        except FileNotFoundError:
+            return []
+
+    def get_image_files(self):
+        try:
+            return [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
         except FileNotFoundError:
             return []
     
@@ -196,23 +205,26 @@ class MediaPlayer:
                 logger.error(f"Kamera yayını hatası: {e}")
                 return False, f"Hata: {str(e)}"
 
-    def play_slideshow(self, duration=5):
+    def play_slideshow(self, images=None, interval=5):
         """Resim slayt gösterisi oynat"""
-        image_files = [os.path.join(IMAGE_DIR, f) for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-
-        if not image_files:
-            logger.error("Slayt için resim bulunamadı")
-            return False, "Resim bulunamadı"
+        if not images:
+            image_files = self.get_image_files()
+            if not image_files:
+                logger.error("Slayt için resim bulunamadı")
+                return False, "Resim bulunamadı"
+            image_paths = [os.path.join(IMAGE_DIR, f) for f in image_files]
+        else:
+            image_paths = [os.path.join(IMAGE_DIR, img) for img in images]
 
         self.stop_current()
         self.pause_automation()
 
         with self.lock:
             try:
-                cmd = ['mpv'] + self.config.get('mpv_options', []) + [f'--image-display-duration={duration}', '--loop=inf'] + image_files
+                cmd = ['mpv'] + self.config.get('mpv_options', []) + [f'--image-display-duration={interval}', '--loop=inf'] + image_paths
                 self.current_process = subprocess.Popen(cmd)
                 self.current_source = 'slayt'
-                logger.info(f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_files)}")
+                logger.info(f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_paths)}")
                 return True, "Slayt gösterisi başlatıldı"
             except Exception as e:
                 logger.error(f"Slayt gösterisi hatası: {e}")
@@ -338,6 +350,10 @@ def status():
 def videos():
     return jsonify({'videos': player.get_video_files()})
 
+@app.route('/images')
+def images():
+    return jsonify({'images': player.get_image_files()})
+
 @app.route('/play_video', methods=['POST'])
 def play_video():
     """Video oynatma endpoint'i"""
@@ -370,7 +386,10 @@ def play_camera():
 def play_slideshow():
     """Slayt gösterisi endpoint'i"""
     logger.info("Slayt gösterisi isteği alındı")
-    success, message = player.play_slideshow()
+    data = request.get_json(silent=True) or {}
+    images = data.get('images')
+    interval = data.get('interval', 5)
+    success, message = player.play_slideshow(images, interval)
     return jsonify({
         'success': success,
         'message': message,
@@ -399,12 +418,31 @@ def announce():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    file = request.files.get('file')
-    if not file:
+    if 'files[]' not in request.files:
         return jsonify({'success': False, 'message': 'Dosya bulunamadı'})
-    path = os.path.join(VIDEO_DIR, file.filename)
-    file.save(path)
-    return jsonify({'success': True})
+    
+    files = request.files.getlist('files[]')
+    
+    for file in files:
+        if file:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            
+    return jsonify({'success': True, 'message': 'Dosyalar yüklendi'})
+
+@app.route('/upload_image', methods=['POST'])
+def upload_image():
+    if 'files[]' not in request.files:
+        return jsonify({'success': False, 'message': 'Dosya bulunamadı'})
+    
+    files = request.files.getlist('files[]')
+    
+    for file in files:
+        if file:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], filename))
+            
+    return jsonify({'success': True, 'message': 'Görseller yüklendi'})
 
 
 @app.route('/cameras', methods=['GET', 'POST', 'DELETE'])
@@ -498,117 +536,74 @@ def discover_onvif_cameras():
                 result = sock.connect_ex((ip, 80))
                 sock.close()
                 
-                if result != 0:
-                    return None
-                
-                # ONVIF kamerası oluşturmayı dene
-                camera = ONVIFCamera(ip, 80, 'admin', 'admin')
-                
-                # Device bilgilerini al
-                device_service = camera.create_devicemgmt_service()
-                device_info = device_service.GetDeviceInformation()
-                
-                return {
-                    'ip': ip,
-                    'port': 80,
-                    'name': f"{device_info.Manufacturer} {device_info.Model}",
-                    'manufacturer': device_info.Manufacturer,
-                    'model': device_info.Model,
-                    'serial': device_info.SerialNumber
-                }
-                
-            except Exception as e:
-                # Sessizce geç, bu normal
-                return None
-        
-        # Paralel olarak IP aralığını tara
+                if result == 0:
+                    # Port 80 açıksa, ONVIF servisini kontrol et
+                    cam = ONVIFCamera(ip, 80, '', '')
+                    hostname = cam.devicemgmt.GetHostname().Name
+                    return {'ip': ip, 'port': 80, 'hostname': hostname}
+            except Exception:
+                pass
+            return None
+
         with ThreadPoolExecutor(max_workers=20) as executor:
-            futures = []
-            
-            # IP aralığını tara (1-254)
-            for i in range(1, 255):
-                ip = f"{network_base}.{i}"
-                futures.append(executor.submit(check_onvif_camera, ip))
-            
-            # Sonuçları topla
+            futures = [executor.submit(check_onvif_camera, f"{network_base}.{i}") for i in range(1, 255)]
             for future in as_completed(futures):
                 result = future.result()
                 if result:
                     discovered_cameras.append(result)
-                    logger.info(f"ONVIF kamerası bulundu: {result['ip']} - {result['name']}")
+                    logger.info(f"ONVIF kamera bulundu: {result}")
         
-        logger.info(f"ONVIF keşfi tamamlandı. {len(discovered_cameras)} kamera bulundu")
-        
+        return discovered_cameras
     except ImportError:
-        logger.error("python-onvif-zeep kütüphanesi bulunamadı")
+        logger.error("onvif-zeep veya netifaces kütüphanesi yüklü değil. Keşif yapılamıyor.")
         return []
     except Exception as e:
-        logger.error(f"ONVIF keşif hatası: {e}")
+        logger.error(f"Kamera keşfi sırasında hata: {e}")
         return []
-    
-    return discovered_cameras
-
 
 @app.route('/discover_cameras', methods=['POST'])
 def discover_cameras():
     """Ağdaki kameraları keşfet"""
     logger.info("Kamera keşfi isteği alındı")
-    
     try:
         cameras = discover_onvif_cameras()
-        
-        return jsonify({
-            'success': True,
-            'cameras': cameras,
-            'message': f'{len(cameras)} kamera bulundu'
-        })
-        
+        return jsonify({'success': True, 'cameras': cameras})
     except Exception as e:
-        logger.error(f"Kamera keşfi hatası: {e}")
-        return jsonify({
-            'success': False,
-            'cameras': [],
-            'message': f'Keşif hatası: {str(e)}'
-        })
-
+        logger.error(f"Kamera keşfi API hatası: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 def startup_sequence():
     """Başlangıç dizisi - fallback mantığı"""
-    logger.info("Pi-Ekran başlatılıyor...")
-    
-    # Yapılandırmada belirtilen süre kadar bekle
     delay = player.config.get('startup_delay', 5)
     logger.info(f"{delay} saniye bekleniyor...")
     time.sleep(delay)
     
-    # Varsayılan videoyu oynat
     try:
+        # Varsayılan videoyu oynat
         success, message = player.play_video()
-        if success:
-            logger.info("Başlangıç videosu oynatılıyor")
-        else:
+        if not success:
             logger.error(f"Başlangıç videosu oynatılamadı: {message}")
     except Exception as e:
-        logger.error(f"Başlangıç hatası: {e}")
+        logger.error(f"Başlangıç dizisi hatası: {e}")
 
 def signal_handler(sig, frame):
     """Graceful shutdown"""
     logger.info("Kapatma sinyali alındı")
     try:
+        player.stop_current()
         player.scheduler.shutdown()
-    except Exception:
-        pass
-    player.stop_current()
-    exit(0)
+    except Exception as e:
+        logger.error(f"Kapatma sırasında hata: {e}")
+    os._exit(0)
 
 if __name__ == '__main__':
-    # Signal handler'ı ayarla
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Başlangıç dizisini çalıştır
-    startup_sequence()
+    # Başlangıç dizisini ayrı bir thread'de çalıştır
+    startup_thread = threading.Thread(target=startup_sequence)
+    startup_thread.daemon = True
+    startup_thread.start()
     
-    # Flask uygulamasını başlat
     logger.info("Web sunucusu başlatılıyor...")
     app.run(host='0.0.0.0', port=player.config.get('web_port', 5000), debug=False)

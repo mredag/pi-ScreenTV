@@ -132,7 +132,7 @@
                             
                             <!-- Upload Area -->
                             <div class="upload-area">
-                                <input type="file" id="uploadInput" class="upload-input" accept="video/mp4">
+                                <input type="file" id="uploadInput" class="upload-input" accept="video/mp4" multiple>
                                 <label for="uploadInput" class="upload-label">
                                     <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -141,7 +141,19 @@
                                     </svg>
                                     Video Yükle
                                 </label>
-                                <button class="control-button" id="uploadBtn" style="display: none;">Video Yükle</button>
+                            </div>
+
+                            <!-- Image Upload Area -->
+                            <div class="upload-area">
+                                <input type="file" id="imageUploadInput" class="upload-input" accept="image/*" multiple>
+                                <label for="imageUploadInput" class="upload-label">
+                                    <svg class="button-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <polyline points="21,15 16,10 5,21"/>
+                                    </svg>
+                                    Görsel Ekle
+                                </label>
                             </div>
                             
                             <!-- Control Buttons -->
@@ -153,7 +165,7 @@
                                     <span>Seçilen Videoları Oynat</span>
                                 </button>
 
-                                <button class="control-button slideshow-button" id="playSlideshowBtn" disabled>
+                                <button class="control-button slideshow-button" id="playSlideshowBtn">
                                     <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <rect x="3" y="4" width="18" height="12" rx="1" ry="1"/>
                                         <line x1="7" y1="8" x2="7" y2="12"/>
@@ -339,6 +351,36 @@
                             <line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
                         <span>Kamerayı Ekle</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slideshow Settings Modal -->
+    <div id="slideshowModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Slayt Gösterisi Ayarları</h3>
+                <button class="close" id="closeSlideshowModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="slideshowForm">
+                    <div class="form-group">
+                        <label for="slideshowInterval" class="form-label">Görsel Değişim Aralığı (saniye):</label>
+                        <input type="number" id="slideshowInterval" name="interval" class="form-input" value="5" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <h4 class="card-title mb-4">Gösterilecek Görseller</h4>
+                        <div id="slideshowImageList" class="slideshow-image-list">
+                            <!-- Images will be loaded here -->
+                        </div>
+                    </div>
+                    <button type="submit" class="control-button slideshow-button">
+                        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span>Slayt Gösterisini Başlat</span>
                     </button>
                 </form>
             </div>
