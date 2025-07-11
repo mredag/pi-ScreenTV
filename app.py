@@ -142,8 +142,8 @@ class MediaPlayer:
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
                     cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
                 )
                 
                 self.current_source = 'video'
@@ -181,8 +181,8 @@ class MediaPlayer:
                 # İşlemi başlat
                 self.current_process = subprocess.Popen(
                     cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
                 )
                 
                 self.current_source = 'camera'
