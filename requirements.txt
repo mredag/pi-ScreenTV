@@ -1,4 +1,4 @@
-Flask
-APScheduler
-python-onvif-zeep
-netifaces
+Flask==2.3.3
+APScheduler==3.10.4
+onvif-zeep==0.2.12
+netifaces==0.11.0
