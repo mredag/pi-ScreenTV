@@ -37,6 +37,9 @@ class PiEkranController {
 
         // Videoları yükle
         this.loadVideos();
+
+        // Kameraları yükle
+        this.loadCameras();
     }
     
     bindEvents() {
@@ -264,6 +267,16 @@ class PiEkranController {
             this.renderVideoList(data.videos || []);
         } catch (e) {
             this.addLog('Video listesi alınamadı', 'error');
+        }
+    }
+
+    async loadCameras() {
+        try {
+            const response = await fetch('/cameras');
+            const data = await response.json();
+            this.renderCameraList(data.cameras || []);
+        } catch (e) {
+            this.addLog('Kamera listesi alınamadı', 'error');
         }
     }
 
