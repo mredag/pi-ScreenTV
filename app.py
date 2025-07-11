@@ -347,7 +347,9 @@ def play_video():
 def play_camera():
     """Kamera yayını endpoint'i"""
     logger.info("Kamera yayını isteği alındı")
-    success, message = player.play_camera()
+    data = request.get_json(silent=True) or {}
+    name = data.get('name')
+    success, message = player.play_camera(name)
     
     return jsonify({
         'success': success,
