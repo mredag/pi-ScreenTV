@@ -22,7 +22,24 @@ class PiEkranController {
             lastUpdate: document.getElementById('lastUpdate'),
             cpuTemp: document.getElementById('cpuTemp'),
             diskUsage: document.getElementById('diskUsage'),
-            logContainer: document.getElementById('logContainer')
+            logContainer: document.getElementById('logContainer'),
+            cameraSettingsBtn: document.getElementById('cameraSettingsBtn'),
+            cameraModal: document.getElementById('cameraModal'),
+            closeModal: document.getElementById('closeModal'),
+            modalCameraList: document.getElementById('modalCameraList'),
+            addCameraForm: document.getElementById('addCameraForm'),
+            cameraName: document.getElementById('cameraName'),
+            cameraUrl: document.getElementById('cameraUrl'),
+            scanNetworkBtn: document.getElementById('scanNetworkBtn'),
+            scanButtonText: document.getElementById('scanButtonText'),
+            scanResults: document.getElementById('scanResults'),
+            discoveredCameras: document.getElementById('discoveredCameras'),
+            credentialModal: document.getElementById('credentialModal'),
+            closeCredentialModal: document.getElementById('closeCredentialModal'),
+            credentialForm: document.getElementById('credentialForm'),
+            discoveredCameraName: document.getElementById('discoveredCameraName'),
+            cameraUsername: document.getElementById('cameraUsername'),
+            cameraPassword: document.getElementById('cameraPassword')
         };
         
         // Event listener'ları ekle
@@ -49,6 +66,41 @@ class PiEkranController {
         this.elements.announceBtn.addEventListener('click', () => this.announce());
         this.elements.uploadBtn.addEventListener('click', () => this.upload());
         this.elements.resumeBtn.addEventListener('click', () => this.resume());
+        
+        // Modal event listeners
+        this.elements.cameraSettingsBtn.addEventListener('click', () => this.openCameraModal());
+        this.elements.closeModal.addEventListener('click', () => this.closeCameraModal());
+        this.elements.cameraModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.cameraModal) {
+                this.closeCameraModal();
+            }
+        });
+        
+        // Form event listeners
+        this.elements.addCameraForm.addEventListener('submit', (e) => this.addCamera(e));
+        this.elements.credentialForm.addEventListener('submit', (e) => this.addDiscoveredCamera(e));
+        
+        // Network scanning
+        this.elements.scanNetworkBtn.addEventListener('click', () => this.scanNetwork());
+        
+        // Credential modal
+        this.elements.closeCredentialModal.addEventListener('click', () => this.closeCredentialModal());
+        this.elements.credentialModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.credentialModal) {
+                this.closeCredentialModal();
+            }
+        });
+        
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (this.elements.credentialModal.classList.contains('show')) {
+                    this.closeCredentialModal();
+                } else if (this.elements.cameraModal.classList.contains('show')) {
+                    this.closeCameraModal();
+                }
+            }
+        });
     }
     
     startStatusChecking() {
@@ -405,6 +457,255 @@ class PiEkranController {
         // Maksimum 50 log tut
         while (this.elements.logContainer.children.length > 50) {
             this.elements.logContainer.removeChild(this.elements.logContainer.lastChild);
+        }
+    }
+
+    // Modal Methods
+    openCameraModal() {
+        this.elements.cameraModal.classList.add('show');
+        this.loadModalCameras();
+    }
+
+    closeCameraModal() {
+        this.elements.cameraModal.classList.remove('show');
+        this.elements.addCameraForm.reset();
+    }
+
+    async loadModalCameras() {
+        try {
+            const response = await fetch('/cameras');
+            const data = await response.json();
+            this.renderModalCameraList(data.cameras || []);
+        } catch (e) {
+            this.addLog('Modal kamera listesi alınamadı', 'error');
+        }
+    }
+
+    renderModalCameraList(cameras) {
+        if (cameras.length === 0) {
+            this.elements.modalCameraList.innerHTML = '<div class="empty-camera-list">Henüz kamera eklenmemiş</div>';
+            return;
+        }
+
+        this.elements.modalCameraList.innerHTML = '';
+        cameras.forEach(camera => {
+            const cameraItem = document.createElement('div');
+            cameraItem.className = 'modal-camera-item';
+            cameraItem.innerHTML = `
+                <div class="camera-info">
+                    <h5>${camera.name}</h5>
+                    <p>${camera.url}</p>
+                </div>
+                <div class="camera-actions">
+                    <button class="delete-btn" onclick="piEkran.deleteCamera('${camera.name}')">
+                        Sil
+                    </button>
+                </div>
+            `;
+            this.elements.modalCameraList.appendChild(cameraItem);
+        });
+    }
+
+    async addCamera(event) {
+        event.preventDefault();
+        
+        if (this.isProcessing) return;
+        
+        const name = this.elements.cameraName.value.trim();
+        const url = this.elements.cameraUrl.value.trim();
+        
+        if (!name || !url) {
+            this.addLog('Kamera adı ve URL gerekli', 'error');
+            return;
+        }
+
+        this.isProcessing = true;
+        this.addLog('Yeni kamera ekleniyor...');
+
+        try {
+            const response = await fetch('/cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, url})
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.addLog(`Kamera "${name}" başarıyla eklendi`, 'success');
+                this.elements.addCameraForm.reset();
+                this.loadModalCameras();
+                this.loadCameras(); // Ana listeyi de güncelle
+            } else {
+                this.addLog('Kamera eklenirken hata oluştu', 'error');
+            }
+        } catch (error) {
+            this.addLog('Kamera ekleme hatası', 'error');
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    async deleteCamera(name) {
+        if (this.isProcessing) return;
+        
+        // Silme onayı
+        if (!confirm(`"${name}" kamerasını silmek istediğinizden emin misiniz?`)) {
+            return;
+        }
+
+        this.isProcessing = true;
+        this.addLog(`Kamera "${name}" siliniyor...`);
+
+        try {
+            const response = await fetch('/cameras', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.addLog(`Kamera "${name}" başarıyla silindi`, 'success');
+                this.loadModalCameras();
+                this.loadCameras(); // Ana listeyi de güncelle
+            } else {
+                this.addLog('Kamera silinirken hata oluştu', 'error');
+            }
+        } catch (error) {
+            this.addLog('Kamera silme hatası', 'error');
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    // Network Scanning Methods
+    async scanNetwork() {
+        if (this.isProcessing) return;
+        
+        this.isProcessing = true;
+        this.elements.scanNetworkBtn.classList.add('scanning');
+        this.elements.scanButtonText.textContent = 'Ağ taranıyor...';
+        this.elements.scanResults.style.display = 'block';
+        this.elements.discoveredCameras.innerHTML = '<div class="scanning-message">Ağdaki kameralar aranıyor, lütfen bekleyin...</div>';
+        
+        this.addLog('Ağ taraması başlatıldı...');
+
+        try {
+            const response = await fetch('/discover_cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.addLog(`${data.cameras.length} kamera bulundu`, 'success');
+                this.renderDiscoveredCameras(data.cameras);
+            } else {
+                this.addLog('Kamera taraması başarısız: ' + data.message, 'error');
+                this.elements.discoveredCameras.innerHTML = '<div class="no-cameras-found">Tarama sırasında hata oluştu</div>';
+            }
+        } catch (error) {
+            this.addLog('Ağ tarama hatası', 'error');
+            this.elements.discoveredCameras.innerHTML = '<div class="no-cameras-found">Ağ taraması başarısız</div>';
+        } finally {
+            this.isProcessing = false;
+            this.elements.scanNetworkBtn.classList.remove('scanning');
+            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
+        }
+    }
+
+    renderDiscoveredCameras(cameras) {
+        if (cameras.length === 0) {
+            this.elements.discoveredCameras.innerHTML = '<div class="no-cameras-found">Ağda kamera bulunamadı</div>';
+            return;
+        }
+
+        this.elements.discoveredCameras.innerHTML = '';
+        cameras.forEach(camera => {
+            const cameraItem = document.createElement('div');
+            cameraItem.className = 'discovered-camera-item';
+            cameraItem.innerHTML = `
+                <div class="discovered-camera-info">
+                    <h6>${camera.name || 'Bilinmeyen Kamera'}</h6>
+                    <p>IP: ${camera.ip}</p>
+                    <p>Port: ${camera.port || 80}</p>
+                </div>
+                <button class="add-discovered-btn" onclick="piEkran.showCredentialModal('${camera.ip}', ${camera.port || 80})">
+                    + Ekle
+                </button>
+            `;
+            this.elements.discoveredCameras.appendChild(cameraItem);
+        });
+    }
+
+    // Credential Modal Methods
+    showCredentialModal(ip, port) {
+        this.currentDiscoveredCamera = { ip, port };
+        this.elements.credentialModal.classList.add('show');
+        this.elements.discoveredCameraName.value = `Kamera ${ip}`;
+        this.elements.cameraUsername.value = 'admin';
+        this.elements.cameraPassword.value = '';
+        this.elements.discoveredCameraName.focus();
+    }
+
+    closeCredentialModal() {
+        this.elements.credentialModal.classList.remove('show');
+        this.elements.credentialForm.reset();
+        this.currentDiscoveredCamera = null;
+    }
+
+    async addDiscoveredCamera(event) {
+        event.preventDefault();
+        
+        if (this.isProcessing || !this.currentDiscoveredCamera) return;
+        
+        const name = this.elements.discoveredCameraName.value.trim();
+        const username = this.elements.cameraUsername.value.trim();
+        const password = this.elements.cameraPassword.value.trim();
+        
+        if (!name || !username || !password) {
+            this.addLog('Tüm alanları doldurun', 'error');
+            return;
+        }
+
+        this.isProcessing = true;
+        this.addLog('Keşfedilen kamera ekleniyor...');
+
+        try {
+            // ONVIF kameralar için RTSP URL'sini oluştur
+            const url = `rtsp://${username}:${password}@${this.currentDiscoveredCamera.ip}:554/stream1`;
+            
+            const response = await fetch('/cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name,
+                    url,
+                    username,
+                    password,
+                    ip: this.currentDiscoveredCamera.ip,
+                    port: this.currentDiscoveredCamera.port,
+                    discovered: true
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.addLog(`Kamera "${name}" başarıyla eklendi`, 'success');
+                this.closeCredentialModal();
+                this.loadModalCameras();
+                this.loadCameras(); // Ana listeyi de güncelle
+            } else {
+                this.addLog('Kamera eklenirken hata oluştu', 'error');
+            }
+        } catch (error) {
+            this.addLog('Kamera ekleme hatası', 'error');
+        } finally {
+            this.isProcessing = false;
         }
     }
 }

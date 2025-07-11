@@ -14,6 +14,9 @@ from flask import Flask, render_template, jsonify, request
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
+import socket
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Uygulama dizini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -277,6 +280,12 @@ class MediaPlayer:
         cams.append({'name': name, 'url': url})
         self.save_config()
 
+    def add_camera_with_details(self, camera_data):
+        """Detaylı kamera bilgileriyle kamera ekle"""
+        cams = self.config.setdefault('cameras', [])
+        cams.append(camera_data)
+        self.save_config()
+
     def remove_camera(self, name):
         cams = self.config.get('cameras', [])
         self.config['cameras'] = [c for c in cams if c.get('name') != name]
@@ -406,7 +415,28 @@ def cameras():
     name = data.get('name')
     if request.method == 'POST':
         url = data.get('url')
-        player.add_camera(name, url)
+        username = data.get('username')
+        password = data.get('password')
+        ip = data.get('ip')
+        port = data.get('port')
+        discovered = data.get('discovered', False)
+        
+        # Keşfedilen kameralar için ek bilgileri kaydet
+        camera_data = {
+            'name': name,
+            'url': url
+        }
+        
+        if discovered and username and password:
+            camera_data.update({
+                'username': username,
+                'password': password,
+                'ip': ip,
+                'port': port,
+                'discovered': True
+            })
+        
+        player.add_camera_with_details(camera_data)
     elif request.method == 'DELETE':
         player.remove_camera(name)
     return jsonify({'success': True})
@@ -435,6 +465,111 @@ def system_info():
         logger.warning("Disk bilgisi okunamadı.")
 
     return jsonify({'temperature': temp, 'disk_usage': disk})
+
+
+def discover_onvif_cameras():
+    """ONVIF kameralarını keşfet"""
+    discovered_cameras = []
+    
+    try:
+        # python-onvif-zeep kütüphanesini import et
+        from onvif import ONVIFCamera
+        from zeep.exceptions import Fault
+        
+        # Yerel ağ IP aralığını belirle
+        import netifaces
+        
+        # Varsayılan gateway'i al
+        gateways = netifaces.gateways()
+        default_gateway = gateways['default'][netifaces.AF_INET][0]
+        
+        # IP aralığını hesapla (örn: 192.168.1.1-254)
+        gateway_parts = default_gateway.split('.')
+        network_base = '.'.join(gateway_parts[:3])
+        
+        logger.info(f"ONVIF kamera keşfi başlatıldı: {network_base}.1-254")
+        
+        def check_onvif_camera(ip):
+            """Belirli bir IP'de ONVIF kamerası olup olmadığını kontrol et"""
+            try:
+                # Önce port 80'i kontrol et
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)
+                result = sock.connect_ex((ip, 80))
+                sock.close()
+                
+                if result != 0:
+                    return None
+                
+                # ONVIF kamerası oluşturmayı dene
+                camera = ONVIFCamera(ip, 80, 'admin', 'admin')
+                
+                # Device bilgilerini al
+                device_service = camera.create_devicemgmt_service()
+                device_info = device_service.GetDeviceInformation()
+                
+                return {
+                    'ip': ip,
+                    'port': 80,
+                    'name': f"{device_info.Manufacturer} {device_info.Model}",
+                    'manufacturer': device_info.Manufacturer,
+                    'model': device_info.Model,
+                    'serial': device_info.SerialNumber
+                }
+                
+            except Exception as e:
+                # Sessizce geç, bu normal
+                return None
+        
+        # Paralel olarak IP aralığını tara
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            futures = []
+            
+            # IP aralığını tara (1-254)
+            for i in range(1, 255):
+                ip = f"{network_base}.{i}"
+                futures.append(executor.submit(check_onvif_camera, ip))
+            
+            # Sonuçları topla
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    discovered_cameras.append(result)
+                    logger.info(f"ONVIF kamerası bulundu: {result['ip']} - {result['name']}")
+        
+        logger.info(f"ONVIF keşfi tamamlandı. {len(discovered_cameras)} kamera bulundu")
+        
+    except ImportError:
+        logger.error("python-onvif-zeep kütüphanesi bulunamadı")
+        return []
+    except Exception as e:
+        logger.error(f"ONVIF keşif hatası: {e}")
+        return []
+    
+    return discovered_cameras
+
+
+@app.route('/discover_cameras', methods=['POST'])
+def discover_cameras():
+    """Ağdaki kameraları keşfet"""
+    logger.info("Kamera keşfi isteği alındı")
+    
+    try:
+        cameras = discover_onvif_cameras()
+        
+        return jsonify({
+            'success': True,
+            'cameras': cameras,
+            'message': f'{len(cameras)} kamera bulundu'
+        })
+        
+    except Exception as e:
+        logger.error(f"Kamera keşfi hatası: {e}")
+        return jsonify({
+            'success': False,
+            'cameras': [],
+            'message': f'Keşif hatası: {str(e)}'
+        })
 
 
 def startup_sequence():

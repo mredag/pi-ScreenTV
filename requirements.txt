@@ -1,2 +1,4 @@
 Flask
 APScheduler
+python-onvif-zeep
+netifaces
