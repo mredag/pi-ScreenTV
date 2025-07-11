@@ -33,7 +33,7 @@ pip install -r requirements.txt
 deactivate
 
 step "4. Creating required directories"
-mkdir -p videos logs
+mkdir -p videos logs images
 
 if [ -f logo.png ]; then
   step "Setting desktop wallpaper"
