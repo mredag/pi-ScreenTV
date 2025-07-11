@@ -13,7 +13,7 @@ class PiEkranController {
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
             uploadInput: document.getElementById('uploadInput'),
-            uploadBtn: document.getElementById('uploadBtn'),
+            imageUploadInput: document.getElementById('imageUploadInput'),
             resumeBtn: document.getElementById('resumeBtn'),
             cameraList: document.getElementById('cameraList'),
             videoList: document.getElementById('videoList'),
@@ -22,7 +22,28 @@ class PiEkranController {
             lastUpdate: document.getElementById('lastUpdate'),
             cpuTemp: document.getElementById('cpuTemp'),
             diskUsage: document.getElementById('diskUsage'),
-            logContainer: document.getElementById('logContainer')
+            logContainer: document.getElementById('logContainer'),
+            cameraSettingsBtn: document.getElementById('cameraSettingsBtn'),
+            cameraModal: document.getElementById('cameraModal'),
+            closeModal: document.getElementById('closeModal'),
+            modalCameraList: document.getElementById('modalCameraList'),
+            addCameraForm: document.getElementById('addCameraForm'),
+            cameraName: document.getElementById('cameraName'),
+            cameraUrl: document.getElementById('cameraUrl'),
+            scanNetworkBtn: document.getElementById('scanNetworkBtn'),
+            scanButtonText: document.getElementById('scanButtonText'),
+            scanResults: document.getElementById('scanResults'),
+            discoveredCameras: document.getElementById('discoveredCameras'),
+            credentialModal: document.getElementById('credentialModal'),
+            closeCredentialModal: document.getElementById('closeCredentialModal'),
+            credentialForm: document.getElementById('credentialForm'),
+            discoveredCameraName: document.getElementById('discoveredCameraName'),
+            cameraUsername: document.getElementById('cameraUsername'),
+            cameraPassword: document.getElementById('cameraPassword'),
+            slideshowModal: document.getElementById('slideshowModal'),
+            closeSlideshowModal: document.getElementById('closeSlideshowModal'),
+            slideshowForm: document.getElementById('slideshowForm'),
+            slideshowImageList: document.getElementById('slideshowImageList'),
         };
         
         // Event listener'ları ekle
@@ -44,11 +65,58 @@ class PiEkranController {
     
     bindEvents() {
         this.elements.playVideoBtn.addEventListener('click', () => this.playVideo());
-        this.elements.playSlideshowBtn.addEventListener('click', () => this.playSlideshow());
+        this.elements.playSlideshowBtn.addEventListener('click', () => this.openSlideshowModal());
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
-        this.elements.uploadBtn.addEventListener('click', () => this.upload());
+        this.elements.uploadInput.addEventListener('change', () => this.uploadVideo());
+        this.elements.imageUploadInput.addEventListener('change', () => this.uploadImage());
         this.elements.resumeBtn.addEventListener('click', () => this.resume());
+        
+        // Modal event listeners
+        this.elements.cameraSettingsBtn.addEventListener('click', () => this.openCameraModal());
+        this.elements.closeModal.addEventListener('click', () => this.closeCameraModal());
+        this.elements.cameraModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.cameraModal) {
+                this.closeCameraModal();
+            }
+        });
+
+        // Slideshow modal event listeners
+        this.elements.closeSlideshowModal.addEventListener('click', () => this.closeSlideshowModal());
+        this.elements.slideshowModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.slideshowModal) {
+                this.closeSlideshowModal();
+            }
+        });
+        this.elements.slideshowForm.addEventListener('submit', (e) => this.handleSlideshowForm(e));
+        
+        // Form event listeners
+        this.elements.addCameraForm.addEventListener('submit', (e) => this.addCamera(e));
+        this.elements.credentialForm.addEventListener('submit', (e) => this.addDiscoveredCamera(e));
+        
+        // Network scanning
+        this.elements.scanNetworkBtn.addEventListener('click', () => this.scanNetwork());
+        
+        // Credential modal
+        this.elements.closeCredentialModal.addEventListener('click', () => this.closeCredentialModal());
+        this.elements.credentialModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.credentialModal) {
+                this.closeCredentialModal();
+            }
+        });
+        
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (this.elements.credentialModal.classList.contains('show')) {
+                    this.closeCredentialModal();
+                } else if (this.elements.cameraModal.classList.contains('show')) {
+                    this.closeCameraModal();
+                } else if (this.elements.slideshowModal.classList.contains('show')) {
+                    this.closeSlideshowModal();
+                }
+            }
+        });
     }
     
     startStatusChecking() {
@@ -118,7 +186,6 @@ class PiEkranController {
             this.elements.playSlideshowBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
-            this.elements.uploadBtn.disabled = false;
             this.elements.resumeBtn.disabled = !status.automation_paused;
             
             // Buton durumlarını güncelle
@@ -209,7 +276,7 @@ class PiEkranController {
         }
     }
 
-    async playSlideshow() {
+    async playSlideshow(images, interval) {
         if (this.isProcessing) return;
         this.isProcessing = true;
         this.disableAllButtons();
@@ -217,11 +284,16 @@ class PiEkranController {
         this.addLog('Slayt gösterisi isteği gönderiliyor...');
 
         try {
-            const response = await fetch('/play_slideshow', { method: 'POST' });
+            const response = await fetch('/play_slideshow', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({images: images, interval: interval})
+            });
             const data = await response.json();
             if (data.success) {
                 this.addLog('Slayt gösterisi başarıyla başlatıldı', 'success');
                 this.updateUI(data.status);
+                this.closeSlideshowModal();
             } else {
                 this.addLog(`Hata: ${data.message}`, 'error');
             }
@@ -305,27 +377,64 @@ class PiEkranController {
         });
     }
 
-    async upload() {
-        const file = this.elements.uploadInput.files[0];
-        if (!file) return;
-        const form = new FormData();
-        form.append('file', file);
+    async uploadVideo() {
+        const files = this.elements.uploadInput.files;
+        if (files.length === 0) return;
+
         this.isProcessing = true;
         this.disableAllButtons();
+        this.addLog(`${files.length} video yükleniyor...`);
+
+        const formData = new FormData();
+        for (const file of files) {
+            formData.append('files[]', file);
+        }
+
         try {
-            const res = await fetch('/upload', {method: 'POST', body: form});
+            const res = await fetch('/upload', {method: 'POST', body: formData});
             const data = await res.json();
             if (data.success) {
-                this.addLog('Video yüklendi', 'success');
+                this.addLog('Video(lar) başarıyla yüklendi', 'success');
                 this.loadVideos();
             } else {
-                this.addLog('Yükleme hatası', 'error');
+                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
             }
         } catch (e) {
-            this.addLog('Yükleme hatası', 'error');
+            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
         } finally {
             this.isProcessing = false;
             this.updateButtons({playing:false});
+            this.elements.uploadInput.value = ''; // Reset file input
+        }
+    }
+
+    async uploadImage() {
+        const files = this.elements.imageUploadInput.files;
+        if (files.length === 0) return;
+
+        this.isProcessing = true;
+        this.disableAllButtons();
+        this.addLog(`${files.length} görsel yükleniyor...`);
+
+        const formData = new FormData();
+        for (const file of files) {
+            formData.append('files[]', file);
+        }
+
+        try {
+            const res = await fetch('/upload_image', {method: 'POST', body: formData});
+            const data = await res.json();
+            if (data.success) {
+                this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
+            } else {
+                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+        } finally {
+            this.isProcessing = false;
+            this.updateButtons({playing:false});
+            this.elements.imageUploadInput.value = ''; // Reset file input
         }
     }
 
@@ -373,7 +482,6 @@ class PiEkranController {
         this.elements.playSlideshowBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
         this.elements.announceBtn.disabled = true;
-        this.elements.uploadBtn.disabled = true;
         this.elements.resumeBtn.disabled = true;
     }
     
@@ -407,10 +515,152 @@ class PiEkranController {
             this.elements.logContainer.removeChild(this.elements.logContainer.lastChild);
         }
     }
+
+    // Modal Methods
+    openCameraModal() {
+        this.elements.cameraModal.classList.add('show');
+        this.loadModalCameras();
+    }
+
+    closeCameraModal() {
+        this.elements.cameraModal.classList.remove('show');
+        this.elements.addCameraForm.reset();
+    }
+
+    async loadModalCameras() {
+        try {
+            const response = await fetch('/cameras');
+            const data = await response.json();
+            this.renderModalCameraList(data.cameras || []);
+        } catch (e) {
+            this.addLog('Modal kamera listesi alınamadı', 'error');
+        }
+    }
+
+    renderModalCameraList(cameras) {
+        if (cameras.length === 0) {
+            this.elements.modalCameraList.innerHTML = '<div class="empty-camera-list">Henüz kamera eklenmemiş</div>';
+            return;
+        }
+
+        this.elements.modalCameraList.innerHTML = '';
+        cameras.forEach(camera => {
+            const cameraItem = document.createElement('div');
+            cameraItem.className = 'modal-camera-item';
+            cameraItem.innerHTML = `
+                <div class="camera-info">
+                    <h5>${camera.name}</h5>
+                    <p>${camera.url}</p>
+                </div>
+                <div class="camera-actions">
+                    <button class="delete-btn" onclick="piEkran.deleteCamera('${camera.name}')">
+                        Sil
+                    </button>
+                </div>
+            `;
+            this.elements.modalCameraList.appendChild(cameraItem);
+        });
+    }
+
+    async addCamera(event) {
+        event.preventDefault();
+        const name = this.elements.cameraName.value;
+        const url = this.elements.cameraUrl.value;
+        if (!name || !url) return;
+
+        try {
+            const response = await fetch('/cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, url})
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Kamera eklendi', 'success');
+                this.loadModalCameras();
+                this.loadCameras();
+                this.elements.addCameraForm.reset();
+            } else {
+                this.addLog('Kamera eklenemedi', 'error');
+            }
+        } catch (e) {
+            this.addLog('Kamera eklenirken hata', 'error');
+        }
+    }
+
+    async deleteCamera(name) {
+        if (!confirm(`'${name}' adlı kamerayı silmek istediğinizden emin misiniz?`)) return;
+
+        try {
+            const response = await fetch('/cameras', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Kamera silindi', 'success');
+                this.loadModalCameras();
+                this.loadCameras();
+            } else {
+                this.addLog('Kamera silinemedi', 'error');
+            }
+        } catch (e) {
+            this.addLog('Kamera silinirken hata', 'error');
+        }
+    }
+
+    // Slideshow Modal Methods
+    async openSlideshowModal() {
+        this.elements.slideshowModal.classList.add('show');
+        await this.loadSlideshowImages();
+    }
+
+    closeSlideshowModal() {
+        this.elements.slideshowModal.classList.remove('show');
+    }
+
+    async loadSlideshowImages() {
+        try {
+            const response = await fetch('/images');
+            const data = await response.json();
+            this.renderSlideshowImageList(data.images || []);
+        } catch (e) {
+            this.addLog('Görsel listesi alınamadı', 'error');
+        }
+    }
+
+    renderSlideshowImageList(images) {
+        this.elements.slideshowImageList.innerHTML = '';
+        if (images.length === 0) {
+            this.elements.slideshowImageList.innerHTML = '<p>Slayt gösterisi için hiç görsel bulunamadı.</p>';
+            return;
+        }
+        images.forEach(image => {
+            const label = document.createElement('label');
+            label.className = 'video-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = image;
+            cb.checked = true;
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(' ' + image));
+            this.elements.slideshowImageList.appendChild(label);
+        });
+    }
+
+    handleSlideshowForm(event) {
+        event.preventDefault();
+        const selectedImages = Array.from(this.elements.slideshowImageList.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+        const interval = this.elements.slideshowForm.querySelector('#slideshowInterval').value;
+
+        if (selectedImages.length > 0) {
+            this.playSlideshow(selectedImages, interval);
+        } else {
+            this.addLog('Lütfen slayt gösterisi için en az bir görsel seçin.', 'warning');
+        }
+    }
 }
 
-// Sayfa yüklendiğinde kontrolcüyü başlat
-document.addEventListener('DOMContentLoaded', () => {
-    window.piEkran = new PiEkranController();
-});
-
+const piEkran = new PiEkranController();
