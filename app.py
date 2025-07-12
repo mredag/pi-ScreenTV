@@ -599,59 +599,81 @@ def logs():
         return jsonify({'success': False, 'logs': str(e)})
 
 def discover_onvif_cameras():
-    """ONVIF kameralarını keşfet"""
+    """Ağdaki tüm arayüzleri tarayarak ONVIF kameralarını keşfet"""
     discovered_cameras = []
     
     try:
-        # python-onvif-zeep kütüphanesini import et
         from onvif import ONVIFCamera
-        from zeep.exceptions import Fault
-        
-        # Yerel ağ IP aralığını belirle
         import netifaces
-        
-        # Varsayılan gateway'i al
-        gateways = netifaces.gateways()
-        default_gateway = gateways['default'][netifaces.AF_INET][0]
-        
-        # IP aralığını hesapla (örn: 192.168.1.1-254)
-        gateway_parts = default_gateway.split('.')
-        network_base = '.'.join(gateway_parts[:3])
-        
-        logger.info(f"ONVIF kamera keşfi başlatıldı: {network_base}.1-254")
-        
+
+        logger.info("ONVIF kamera keşfi başlatıldı.")
+
         def check_onvif_camera(ip):
             """Belirli bir IP'de ONVIF kamerası olup olmadığını kontrol et"""
             try:
-                # Önce port 80'i kontrol et
+                # Standart ONVIF portu 80'dir, ancak bazı kameralar farklı portlar kullanabilir.
+                # Şimdilik sadece port 80'i kontrol ediyoruz.
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(2)
-                result = sock.connect_ex((ip, 80))
-                sock.close()
-                
-                if result == 0:
-                    # Port 80 açıksa, ONVIF servisini kontrol et
+                sock.settimeout(1)
+                if sock.connect_ex((ip, 80)) == 0:
+                    sock.close()
+                    logger.info(f"IP {ip}: Port 80 açık, ONVIF kontrol ediliyor...")
                     cam = ONVIFCamera(ip, 80, '', '')
                     hostname = cam.devicemgmt.GetHostname().Name
+                    logger.info(f"ONVIF kamera bulundu: IP={ip}, Hostname={hostname}")
                     return {'ip': ip, 'port': 80, 'hostname': hostname}
-            except Exception:
+                sock.close()
+            except Exception as e:
+                # Hata loglaması keşif sürecini yavaşlatabilir, bu yüzden sadece debug seviyesinde logla
+                # logger.debug(f"IP {ip} kontrol edilirken hata: {e}")
                 pass
             return None
 
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            futures = [executor.submit(check_onvif_camera, f"{network_base}.{i}") for i in range(1, 255)]
+        subnets = set()
+        for iface in netifaces.interfaces():
+            ifaddrs = netifaces.ifaddresses(iface)
+            if netifaces.AF_INET in ifaddrs:
+                for addr_info in ifaddrs[netifaces.AF_INET]:
+                    ip = addr_info.get('addr')
+                    netmask = addr_info.get('netmask')
+                    if ip and netmask and not ip.startswith('127.'):
+                        try:
+                            # Subnet'i hesapla (örn: 192.168.1.0)
+                            ip_parts = list(map(int, ip.split('.')))
+                            mask_parts = list(map(int, netmask.split('.')))
+                            net_start = [ip_parts[i] & mask_parts[i] for i in range(4)]
+                            subnet = '.'.join(map(str, net_start[:3]))
+                            subnets.add(subnet)
+                        except ValueError:
+                            logger.warning(f"Geçersiz IP/Netmask formatı: {ip}/{netmask}")
+
+
+        if not subnets:
+            logger.warning("Taranacak ağ arayüzü bulunamadı.")
+            return []
+
+        logger.info(f"Taranacak ağlar: {list(subnets)}")
+        
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = []
+            for subnet_base in subnets:
+                for i in range(1, 255):
+                    ip_to_check = f"{subnet_base}.{i}"
+                    futures.append(executor.submit(check_onvif_camera, ip_to_check))
+            
             for future in as_completed(futures):
                 result = future.result()
                 if result:
                     discovered_cameras.append(result)
-                    logger.info(f"ONVIF kamera bulundu: {result}")
-        
+
+        logger.info(f"Keşif tamamlandı. Toplam {len(discovered_cameras)} kamera bulundu.")
         return discovered_cameras
+
     except ImportError:
-        logger.error("onvif-zeep veya netifaces kütüphanesi yüklü değil. Keşif yapılamıyor.")
+        logger.error("Gerekli kütüphaneler (onvif-py3, netifaces) yüklü değil. Keşif yapılamıyor.")
         return []
     except Exception as e:
-        logger.error(f"Kamera keşfi sırasında hata: {e}")
+        logger.error(f"Kamera keşfi sırasında beklenmedik bir hata oluştu: {e}", exc_info=True)
         return []
 
 @app.route('/discover_cameras', methods=['POST'])
