@@ -18,7 +18,8 @@ from flask_login import (
     logout_user,
     login_required,
 )
-from werkzeug.security import check_password_hash
+
+from werkzeug.security import check_password_hash, generate_password_hash
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
@@ -27,6 +28,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
 import psutil
+import shutil
 
 # Uygulama dizini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -75,6 +77,15 @@ def load_user(user_id):
     if user_id == app.config.get("USERNAME"):
         return User(user_id)
     return None
+
+
+
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    if request.is_json:
+        return jsonify({"success": False, "message": "Oturum gerekli"}), 401
+    return redirect(url_for("login"))
+
 
 
 class MediaPlayer:
@@ -169,6 +180,9 @@ class MediaPlayer:
 
     def play_video(self, video_list=None):
         """Video oynat"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         self.videos = self.get_video_files()
         if not video_list:
             if not self.videos:
@@ -215,6 +229,9 @@ class MediaPlayer:
 
     def play_camera(self, name=None):
         """Kamera yayınını göster"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         cameras = self.config.get("cameras", [])
         camera_url = None
         if name:
@@ -256,6 +273,9 @@ class MediaPlayer:
 
     def play_slideshow(self, images=None, interval=5):
         """Resim slayt gösterisi oynat"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         if not images:
             image_files = self.get_image_files()
             if not image_files:
@@ -421,6 +441,30 @@ def logout():
     logout_user()
     flash("Çıkış yapıldı", "success")
     return redirect(url_for("login"))
+
+
+
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password")
+        new_pass = request.form.get("new_password")
+        confirm = request.form.get("confirm_password")
+
+        if not check_password_hash(app.config.get("PASSWORD_HASH", ""), current):
+            flash("Mevcut şifre hatalı", "error")
+        elif new_pass != confirm:
+            flash("Yeni şifreler eşleşmiyor", "error")
+        else:
+            new_hash = generate_password_hash(new_pass)
+            app.config["PASSWORD_HASH"] = new_hash
+            player.config["PASSWORD_HASH"] = new_hash
+            player.save_config()
+            flash("Şifre güncellendi", "success")
+            return redirect(url_for("dashboard"))
+
+    return render_template("change_password.html")
 
 
 @app.route("/")
