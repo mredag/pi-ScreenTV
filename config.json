@@ -25,5 +25,8 @@
             "end": "19:00",
             "source": "camera"
         }
-    ]
+    ],
+    "SECRET_KEY": "change-this-secret",
+    "USERNAME": "admin",
+    "PASSWORD_HASH": "scrypt:32768:8:1$h93itwcE5ZkxHWc6$7073dfb5a65798d33023793c00a40012bcf4242cb5c7fc5f0ab72faaef428f046fb7bf462019e63218748dfd9167ba1c9abd4240e1917f8cb13cf9132bec823d"
 }
