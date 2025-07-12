@@ -754,6 +754,28 @@ class PiEkranController {
             this.addLog('Lütfen slayt gösterisi için en az bir görsel seçin.', 'warning');
         }
     }
+    async scanNetwork() {
+        this.elements.scanButtonText.textContent = "Ağ taranıyor...";
+        try {
+            const response = await fetch('/discover_cameras', {method: 'POST'});
+            const data = await response.json();
+
+            this.elements.discoveredCameras.innerHTML = '';
+            if (data.success && data.cameras && data.cameras.length > 0) {
+                data.cameras.forEach(cam => {
+                    const li = document.createElement('li');
+                    li.textContent = `${cam.hostname || cam.ip} (${cam.ip}:${cam.port})`;
+                    this.elements.discoveredCameras.appendChild(li);
+                });
+            } else {
+                this.elements.discoveredCameras.innerHTML = '<li>Kamera bulunamadı</li>';
+            }
+        } catch (e) {
+            this.addLog("Ağ taraması başarısız", "error");
+        } finally {
+            this.elements.scanButtonText.textContent = "Ağı Tara ve Kameraları Bul";
+        }
+    }
 }
 
 const piEkran = new PiEkranController();
