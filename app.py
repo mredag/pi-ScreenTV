@@ -18,6 +18,7 @@ from flask_login import (
     logout_user,
     login_required,
 )
+
 from werkzeug.security import check_password_hash, generate_password_hash
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -78,11 +79,13 @@ def load_user(user_id):
     return None
 
 
+
 @login_manager.unauthorized_handler
 def unauthorized_callback():
     if request.is_json:
         return jsonify({"success": False, "message": "Oturum gerekli"}), 401
     return redirect(url_for("login"))
+
 
 
 class MediaPlayer:
@@ -438,6 +441,7 @@ def logout():
     logout_user()
     flash("Çıkış yapıldı", "success")
     return redirect(url_for("login"))
+
 
 
 @app.route("/change_password", methods=["GET", "POST"])
