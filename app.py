@@ -25,7 +25,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 VIDEO_DIR = os.path.join(BASE_DIR, 'videos')
-IMAGE_DIR = os.path.join(BASE_DIR, 'images')
+IMAGE_DIR = os.path.join(BASE_DIR, 'static', 'images')
 
 # Log dizinini oluştur
 os.makedirs(LOG_DIR, exist_ok=True)
