@@ -10,7 +10,15 @@ import subprocess
 import time
 import logging
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    login_required,
+)
+from werkzeug.security import check_password_hash, generate_password_hash
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
@@ -19,6 +27,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
 import psutil
+import shutil
 
 # Uygulama dizini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,6 +59,30 @@ logger = logging.getLogger("PiEkran")
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = VIDEO_DIR
 app.config["IMAGE_UPLOAD_FOLDER"] = IMAGE_DIR
+
+# Flask-Login kurulumu
+login_manager = LoginManager()
+login_manager.login_view = "login"
+login_manager.init_app(app)
+
+
+class User(UserMixin):
+    def __init__(self, username: str):
+        self.id = username
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id == app.config.get("USERNAME"):
+        return User(user_id)
+    return None
+
+
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    if request.is_json:
+        return jsonify({"success": False, "message": "Oturum gerekli"}), 401
+    return redirect(url_for("login"))
 
 
 class MediaPlayer:
@@ -88,6 +121,9 @@ class MediaPlayer:
                     "--no-input-default-bindings",
                 ],
                 "startup_delay": 5,
+                "SECRET_KEY": "change-me",
+                "USERNAME": "admin",
+                "PASSWORD_HASH": "",
             }
 
     def save_config(self):
@@ -141,6 +177,9 @@ class MediaPlayer:
 
     def play_video(self, video_list=None):
         """Video oynat"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         self.videos = self.get_video_files()
         if not video_list:
             if not self.videos:
@@ -187,6 +226,9 @@ class MediaPlayer:
 
     def play_camera(self, name=None):
         """Kamera yayınını göster"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         cameras = self.config.get("cameras", [])
         camera_url = None
         if name:
@@ -228,6 +270,9 @@ class MediaPlayer:
 
     def play_slideshow(self, images=None, interval=5):
         """Resim slayt gösterisi oynat"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         if not images:
             image_files = self.get_image_files()
             if not image_files:
@@ -361,36 +406,98 @@ class MediaPlayer:
 # Global media player instance
 player = MediaPlayer()
 
+# Konfigürasyondan gizli anahtar ve kullanıcı bilgilerini al
+app.config["SECRET_KEY"] = player.config.get("SECRET_KEY", "change-me")
+app.config["USERNAME"] = player.config.get("USERNAME", "admin")
+app.config["PASSWORD_HASH"] = player.config.get("PASSWORD_HASH", "")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        remember = bool(request.form.get("remember"))
+
+        if (
+            username == app.config.get("USERNAME")
+            and check_password_hash(app.config.get("PASSWORD_HASH", ""), password)
+        ):
+            login_user(User(username), remember=remember)
+            flash("Başarıyla giriş yapıldı", "success")
+            return redirect(url_for("dashboard"))
+        else:
+            flash("Kullanıcı adı veya şifre hatalı", "error")
+
+    return render_template("login.html", now=datetime.now())
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("Çıkış yapıldı", "success")
+    return redirect(url_for("login"))
+
+
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password")
+        new_pass = request.form.get("new_password")
+        confirm = request.form.get("confirm_password")
+
+        if not check_password_hash(app.config.get("PASSWORD_HASH", ""), current):
+            flash("Mevcut şifre hatalı", "error")
+        elif new_pass != confirm:
+            flash("Yeni şifreler eşleşmiyor", "error")
+        else:
+            new_hash = generate_password_hash(new_pass)
+            app.config["PASSWORD_HASH"] = new_hash
+            player.config["PASSWORD_HASH"] = new_hash
+            player.save_config()
+            flash("Şifre güncellendi", "success")
+            return redirect(url_for("dashboard"))
+
+    return render_template("change_password.html")
+
 
 @app.route("/")
+@login_required
 def index():
     """Ana sayfa"""
     return render_template("dashboard.html")
 
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     """Gelişmiş kontrol paneli"""
     return render_template("dashboard.html")
 
 
 @app.route("/status")
+@login_required
 def status():
     """Sistem durumu"""
     return jsonify(player.get_status())
 
 
 @app.route("/videos")
+@login_required
 def videos():
     return jsonify({"videos": player.get_video_files()})
 
 
 @app.route("/images")
+@login_required
 def images():
     return jsonify({"images": player.get_image_files()})
 
 
 @app.route("/play_video", methods=["POST"])
+@login_required
 def play_video():
     """Video oynatma endpoint'i"""
     logger.info("Video oynatma isteği alındı")
@@ -404,6 +511,7 @@ def play_video():
 
 
 @app.route("/play_camera", methods=["POST"])
+@login_required
 def play_camera():
     """Kamera yayını endpoint'i"""
     logger.info("Kamera yayını isteği alındı")
@@ -417,6 +525,7 @@ def play_camera():
 
 
 @app.route("/play_slideshow", methods=["POST"])
+@login_required
 def play_slideshow():
     """Slayt gösterisi endpoint'i"""
     logger.info("Slayt gösterisi isteği alındı")
@@ -430,6 +539,7 @@ def play_slideshow():
 
 
 @app.route("/stop", methods=["POST"])
+@login_required
 def stop():
     """Oynatmayı durdur"""
     logger.info("Durdurma isteği alındı")
@@ -445,6 +555,7 @@ def stop():
 
 
 @app.route("/announce", methods=["POST"])
+@login_required
 def announce():
     data = request.get_json(force=True)
     message = data.get("message", "") if data else ""
@@ -454,6 +565,7 @@ def announce():
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload():
     if "files[]" not in request.files:
         return jsonify({"success": False, "message": "Dosya bulunamadı"})
@@ -469,6 +581,7 @@ def upload():
 
 
 @app.route("/upload_image", methods=["POST"])
+@login_required
 def upload_image():
     if "files[]" not in request.files:
         return jsonify({"success": False, "message": "Dosya bulunamadı"})
@@ -484,6 +597,7 @@ def upload_image():
 
 
 @app.route("/delete_video", methods=["POST"])
+@login_required
 def delete_video():
     """Video sil"""
     data = request.get_json(silent=True) or {}
@@ -505,6 +619,7 @@ def delete_video():
 
 
 @app.route("/delete_image", methods=["POST"])
+@login_required
 def delete_image():
     """Görsel sil"""
     data = request.get_json(silent=True) or {}
@@ -526,6 +641,7 @@ def delete_image():
 
 
 @app.route("/cameras", methods=["GET", "POST", "DELETE"])
+@login_required
 def cameras():
     if request.method == "GET":
         return jsonify({"cameras": player.config.get("cameras", [])})
@@ -560,12 +676,14 @@ def cameras():
 
 
 @app.route("/resume", methods=["POST"])
+@login_required
 def resume():
     player.resume_automation()
     return jsonify({"success": True})
 
 
 @app.route("/system_info")
+@login_required
 def system_info():
     temp = "N/A"
     disk = "N/A"
@@ -617,6 +735,7 @@ def system_info():
 
 
 @app.route("/logs")
+@login_required
 def logs():
     """Logları getir"""
     try:
@@ -726,6 +845,7 @@ def discover_onvif_cameras():
 
 
 @app.route("/discover_cameras", methods=["POST"])
+@login_required
 def discover_cameras():
     """Ağdaki kameraları keşfet"""
     logger.info("Kamera keşfi isteği alındı")

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eform TV - Giriş</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo">E</div>
+            <h2>Eform TV Kontrol Paneli</h2>
+            <p>Lütfen devam etmek için giriş yapın.</p>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="input-group">
+                    <label for="username">Kullanıcı Adı</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Şifre</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="remember-me">
+                    <input type="checkbox" id="remember" name="remember">
+                    <label for="remember">Beni Hatırla</label>
+                </div>
+                <button type="submit" class="login-button">Giriş Yap</button>
+            </form>
+        </div>
+        <footer class="login-footer">
+            © {{ now.year }} Eform Spor Merkezi
+        </footer>
+    </div>
+</body>
+</html>

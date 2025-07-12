@@ -11,8 +11,8 @@ cd ~/pi-ekran
 bash install.sh
 ```
 
-Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://pi-ekran.local:5000` adresinden erişebilirsiniz.
-Yeni yan menülü gösterge panelini kullanmak için `http://pi-ekran.local:5000/dashboard` adresine gidin.
+Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://eformtv.local` adresinden erişebilirsiniz.
+Yeni yan menülü gösterge panelini kullanmak için `http://eformtv.local/dashboard` adresine gidin.
 
 ### Güncelleme
 
@@ -57,7 +57,7 @@ sudo systemctl restart pi-ekran.service
 
 SSH ile bağlanın:
 ```bash
-ssh pi@pi-ekran.local
+ssh pi@eformtv.local
 ```
 
 Sistemi güncelleyin:
@@ -146,7 +146,7 @@ python3 app.py
 
 Web tarayıcıda açın:
 ```
-http://pi-ekran.local:5000
+http://eformtv.local
 ```
 
 ## Faz 2: Otomasyon ve Güvenilirlik
@@ -196,7 +196,8 @@ Sistem açıldıktan sonra web arayüzünün otomatik olarak erişilebilir oldu�
 
 ### Ağ Sorunları
 - Statik IP atayın veya router'da DHCP rezervasyonu yapın
-- Firewall'da 5000 portunu açın
+- `.local` alan adının çalışması için Raspberry Pi'de `avahi-daemon` kurulmuş olmalıdır. Windows istemciler için Bonjour yüklü değilse IP adresini kullanabilirsiniz.
+- Firewall'da 5000 (veya Nginx kullanıyorsanız 80) portunu açın
 
 ### Servis Sorunları
 - Logları kontrol edin: `journalctl -u pi-ekran.service -n 50`

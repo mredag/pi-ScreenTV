@@ -24,7 +24,7 @@ sudo apt update -y && sudo apt upgrade -y
 
 step "2. Installing dependencies"
 # Nginx'i bağımlılıklara ekliyoruz
-sudo apt install -y python3 python3-venv python3-pip mpv git nginx # <-- DEĞİŞTİRİLDİ
+sudo apt install -y python3 python3-venv python3-pip mpv git nginx avahi-daemon # avahi mDNS için eklendi
 
 step "3. Setting up Python virtual environment"
 python3 -m venv venv
