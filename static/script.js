@@ -13,8 +13,7 @@ class PiEkranController {
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
             uploadInput: document.getElementById('uploadInput'),
-            imageUploadInput: document.getElementById('imageUploadInput'),
-            resumeBtn: document.getElementById('resumeBtn'),
+            imageUploadInput: document.getElementById('imageUploadInput'),            
             cameraList: document.getElementById('cameraList'),
             videoList: document.getElementById('videoList'),
             currentSource: document.getElementById('currentSource'),
@@ -76,8 +75,7 @@ class PiEkranController {
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
         this.elements.uploadInput.addEventListener('change', () => this.uploadVideo());
-        this.elements.imageUploadInput.addEventListener('change', () => this.uploadImage());
-        this.elements.resumeBtn.addEventListener('click', () => this.resume());
+        this.elements.imageUploadInput.addEventListener('change', () => this.uploadImage());        
         
         // Modal event listeners
         this.elements.cameraSettingsBtn.addEventListener('click', () => this.openCameraModal());
