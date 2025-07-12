@@ -64,6 +64,10 @@ class PiEkranController {
 
         // Görselleri yükle
         this.loadImages();
+
+        for (const [key, el] of Object.entries(this.elements)) {
+            if (!el) console.error(`Element with id '${key}' not found in DOM`);
+        }
     }
     
     bindEvents() {
@@ -848,4 +852,6 @@ class PiEkranController {
     }
 }
 
-const piEkran = new PiEkranController();
+document.addEventListener('DOMContentLoaded', function() {
+    window.piEkran = new PiEkranController();
+});
