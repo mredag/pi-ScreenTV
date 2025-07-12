@@ -191,8 +191,7 @@ class PiEkranController {
             this.elements.playSlideshowBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
-            this.elements.resumeBtn.disabled = !status.automation_paused;
-            
+                        
             // Buton durumlarını güncelle
             this.elements.playVideoBtn.classList.remove('loading');
             this.elements.stopBtn.classList.remove('loading');
@@ -496,8 +495,7 @@ class PiEkranController {
         this.elements.playVideoBtn.disabled = true;
         this.elements.playSlideshowBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
-        this.elements.announceBtn.disabled = true;
-        this.elements.resumeBtn.disabled = true;
+        this.elements.announceBtn.disabled = true;        
     }
     
     handleError(message) {
