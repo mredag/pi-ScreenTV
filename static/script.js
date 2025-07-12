@@ -686,32 +686,39 @@ class PiEkranController {
     }
 
     renderImageList(images) {
-        const imageListContainer = document.getElementById('imageList');
-        if (!imageListContainer) return;
+    const imageListContainer = document.getElementById('imageList');
+    if (!imageListContainer) return;
 
-        imageListContainer.innerHTML = '';
-        images.forEach(image => {
-            const item = document.createElement('div');
-            item.className = 'image-item';
+    imageListContainer.innerHTML = '';
+    images.forEach(image => {
+        const item = document.createElement('div');
+        item.className = 'image-item';
 
-            const img = document.createElement('img');
-            img.src = `/images/${image}`;
-            img.alt = image;
+        const img = document.createElement('img');
+        img.src = `/images/${image}`;
+        img.alt = image;
+        img.style.maxWidth = "80px";
+        img.style.maxHeight = "80px";
+        img.style.objectFit = "cover";
+        img.style.borderRadius = "8px";
+        img.style.display = "block";
+        img.style.margin = "0 auto";
 
-            const name = document.createElement('span');
-            name.textContent = image;
+        const name = document.createElement('span');
+        name.textContent = image;
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.innerHTML = '&times;';
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.onclick = () => this.deleteImage(image);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '&times;';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = () => this.deleteImage(image);
 
-            item.appendChild(img);
-            item.appendChild(name);
-            item.appendChild(deleteBtn);
-            imageListContainer.appendChild(item);
-        });
-    }
+        item.appendChild(img);
+        item.appendChild(name);
+        item.appendChild(deleteBtn);
+        imageListContainer.appendChild(item);
+    });
+}
+
 
     async loadSlideshowImages() {
         try {

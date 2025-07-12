@@ -787,3 +787,12 @@ body {
 .block { display: block; }
 .flex { display: flex; }
 .grid { display: grid; }
+
+.image-item img {
+    max-width: 80px;
+    max-height: 80px;
+    object-fit: cover;
+    border-radius: 8px;   /* köşeler yumuşak olur */
+    display: block;
+    margin: 0 auto;
+}
