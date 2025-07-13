@@ -54,6 +54,8 @@ class PiEkranController {
             closeSlideshowModal: document.getElementById('closeSlideshowModal'),
             slideshowForm: document.getElementById('slideshowForm'),
             slideshowImageList: document.getElementById('slideshowImageList'),
+            videoUploadProgress: document.getElementById('videoUploadProgress'),
+            imageUploadProgress: document.getElementById('imageUploadProgress'),
         };
         
         // Event listener'ları ekle
@@ -409,28 +411,49 @@ class PiEkranController {
         this.isProcessing = true;
         this.disableAllButtons();
         this.addLog(`${files.length} video yükleniyor...`);
+        const progress = this.elements.videoUploadProgress;
+        progress.style.display = 'block';
+        progress.value = 0;
 
         const formData = new FormData();
         for (const file of files) {
             formData.append('files[]', file);
         }
 
-        try {
-            const res = await apiFetch('/upload', {method: 'POST', body: formData});
-            const data = await res.json();
-            if (data.success) {
-                this.addLog('Video(lar) başarıyla yüklendi', 'success');
-                this.loadVideos();
-            } else {
-                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
-            }
-        } catch (e) {
-            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
-        } finally {
-            this.isProcessing = false;
-            this.updateButtons({playing:false});
-            this.elements.uploadInput.value = ''; // Reset file input
-        }
+        await new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload');
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    progress.value = (e.loaded / e.total) * 100;
+                }
+            };
+            xhr.onload = () => {
+                progress.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        this.addLog('Video(lar) başarıyla yüklendi', 'success');
+                        this.loadVideos();
+                    } else {
+                        this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+                    }
+                } catch (err) {
+                    this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                }
+                resolve();
+            };
+            xhr.onerror = () => {
+                progress.style.display = 'none';
+                this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                resolve();
+            };
+            xhr.send(formData);
+        });
+
+        this.isProcessing = false;
+        this.updateButtons({playing:false});
+        this.elements.uploadInput.value = '';
     }
 
     async uploadImage() {
@@ -440,27 +463,48 @@ class PiEkranController {
         this.isProcessing = true;
         this.disableAllButtons();
         this.addLog(`${files.length} görsel yükleniyor...`);
+        const progress = this.elements.imageUploadProgress;
+        progress.style.display = 'block';
+        progress.value = 0;
 
         const formData = new FormData();
         for (const file of files) {
             formData.append('files[]', file);
         }
 
-        try {
-            const res = await apiFetch('/upload_image', {method: 'POST', body: formData});
-            const data = await res.json();
-            if (data.success) {
-                this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
-            } else {
-                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
-            }
-        } catch (e) {
-            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
-        } finally {
-            this.isProcessing = false;
-            this.updateButtons({playing:false});
-            this.elements.imageUploadInput.value = ''; // Reset file input
-        }
+        await new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload_image');
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    progress.value = (e.loaded / e.total) * 100;
+                }
+            };
+            xhr.onload = () => {
+                progress.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
+                    } else {
+                        this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+                    }
+                } catch (err) {
+                    this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                }
+                resolve();
+            };
+            xhr.onerror = () => {
+                progress.style.display = 'none';
+                this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                resolve();
+            };
+            xhr.send(formData);
+        });
+
+        this.isProcessing = false;
+        this.updateButtons({playing:false});
+        this.elements.imageUploadInput.value = '';
     }
 
     async resume() {
