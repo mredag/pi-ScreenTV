@@ -36,6 +36,7 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 VIDEO_DIR = os.path.join(BASE_DIR, "videos")
 IMAGE_DIR = os.path.join(BASE_DIR, "static", "images")
+MPV_LOG_FILE = os.path.join(LOG_DIR, "mpv.log")
 
 # Log dizinini oluştur
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -210,14 +211,26 @@ class MediaPlayer:
                 cmd = (
                     ["mpv"]
                     + self.config.get("mpv_options", [])
-                    + ["--input-ipc-server=/tmp/mpvsocket", "--loop-playlist=inf"]
+                    + [
+                        f"--log-file={MPV_LOG_FILE}",
+                        "--input-ipc-server=/tmp/mpvsocket",
+                        "--loop-playlist=inf",
+                    ]
                     + video_paths
                 )
 
                 # İşlemi başlat
-                self.current_process = subprocess.Popen(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
+                with open(MPV_LOG_FILE, "a") as log_file:
+                    self.current_process = subprocess.Popen(
+                        cmd, stdout=log_file, stderr=log_file
+                    )
+
+                time.sleep(1)
+                if self.current_process.poll() is not None:
+                    logger.error(
+                        f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
+                    )
+                    return False, "mpv başlatılamadı, logları kontrol edin"
 
                 self.current_source = "video"
                 logger.info(f"Video oynatılıyor: {video_paths}")
@@ -255,13 +268,21 @@ class MediaPlayer:
                 cmd = (
                     ["mpv"]
                     + self.config.get("mpv_options", [])
-                    + ["--input-ipc-server=/tmp/mpvsocket", camera_url]
+                    + [f"--log-file={MPV_LOG_FILE}", "--input-ipc-server=/tmp/mpvsocket", camera_url]
                 )
 
                 # İşlemi başlat
-                self.current_process = subprocess.Popen(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
+                with open(MPV_LOG_FILE, "a") as log_file:
+                    self.current_process = subprocess.Popen(
+                        cmd, stdout=log_file, stderr=log_file
+                    )
+
+                time.sleep(1)
+                if self.current_process.poll() is not None:
+                    logger.error(
+                        f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
+                    )
+                    return False, "mpv başlatılamadı, logları kontrol edin"
 
                 self.current_source = "camera"
                 logger.info(f"Kamera yayını başlatıldı: {camera_url}")
@@ -293,10 +314,24 @@ class MediaPlayer:
                 cmd = (
                     ["mpv"]
                     + self.config.get("mpv_options", [])
-                    + [f"--image-display-duration={interval}", "--loop-playlist=inf"]
+                    + [
+                        f"--log-file={MPV_LOG_FILE}",
+                        f"--image-display-duration={interval}",
+                        "--loop-playlist=inf",
+                    ]
                     + image_paths
                 )
-                self.current_process = subprocess.Popen(cmd)
+                with open(MPV_LOG_FILE, "a") as log_file:
+                    self.current_process = subprocess.Popen(
+                        cmd, stdout=log_file, stderr=log_file
+                    )
+
+                time.sleep(1)
+                if self.current_process.poll() is not None:
+                    logger.error(
+                        f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
+                    )
+                    return False, "mpv başlatılamadı, logları kontrol edin"
                 self.current_source = "slayt"
                 logger.info(
                     f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_paths)}"
