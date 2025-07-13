@@ -10,7 +10,17 @@ import subprocess
 import time
 import logging
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, redirect, url_for, flash
+from flask import (
+    Flask,
+    render_template,
+    jsonify,
+    request,
+    redirect,
+    url_for,
+    flash,
+    Response,
+    stream_with_context,
+)
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -25,6 +35,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import signal
 import socket
 import threading
+import queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
 import psutil
@@ -872,36 +883,68 @@ def logs():
         return jsonify({"success": False, "logs": str(e)})
 
 
-def discover_onvif_cameras():
-    """Ağdaki tüm arayüzleri tarayarak ONVIF kameralarını keşfet"""
+def discover_onvif_cameras(progress_callback=None):
+    """Ağdaki tüm arayüzleri tarayarak ONVIF kameralarını keşfet (geliştirilmiş sürüm)"""
     discovered_cameras = []
+
+    # Yaygın ONVIF portları. Bazı kameralar yönetim için farklı portlar kullanabilir.
+    COMMON_ONVIF_PORTS = [80, 8080, 8000, 2020]
 
     try:
         from onvif import ONVIFCamera
         import netifaces
+        import zeep
 
-        logger.info("ONVIF kamera keşfi başlatıldı.")
+        logger.info("Geliştirilmiş ONVIF kamera keşfi başlatıldı.")
 
-        def check_onvif_camera(ip):
-            """Belirli bir IP'de ONVIF kamerası olup olmadığını kontrol et"""
+        def check_onvif_camera(ip, port):
+            """Belirli bir IP ve portta ONVIF kamerası olup olmadığını kontrol et"""
+            if progress_callback:
+                progress_callback({"event": "scan", "ip": ip, "port": port})
             try:
-                # Standart ONVIF portu 80'dir, ancak bazı kameralar farklı portlar kullanabilir.
-                # Şimdilik sadece port 80'i kontrol ediyoruz.
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(1)
-                if sock.connect_ex((ip, 80)) == 0:
-                    sock.close()
-                    logger.info(f"IP {ip}: Port 80 açık, ONVIF kontrol ediliyor...")
-                    cam = ONVIFCamera(ip, 80, "", "")
+                # Öncelikle portun açık olup olmadığını hızlıca kontrol et
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(0.5)
+                    if sock.connect_ex((ip, port)) != 0:
+                        return None
+
+                cam = ONVIFCamera(ip, port, "", "", no_cache=True)
+
+                # Hostname bilgisi
+                try:
                     hostname = cam.devicemgmt.GetHostname().Name
-                    logger.info(f"ONVIF kamera bulundu: IP={ip}, Hostname={hostname}")
-                    return {"ip": ip, "port": 80, "hostname": hostname}
-                sock.close()
-            except Exception as e:
-                # Hata loglaması keşif sürecini yavaşlatabilir, bu yüzden sadece debug seviyesinde logla
-                # logger.debug(f"IP {ip} kontrol edilirken hata: {e}")
-                pass
-            return None
+                except Exception:
+                    logger.warning(f"IP {ip}:{port} için hostname alınamadı.")
+                    hostname = f"ONVIF Camera ({ip})"
+
+                # RTSP URI bilgisi
+                rtsp_url = ""
+                try:
+                    media_profiles = cam.media.GetProfiles()
+                    if media_profiles:
+                        token = media_profiles[0].token
+                        req = cam.media.create_type("GetStreamUri")
+                        req.ProfileToken = token
+                        req.StreamSetup = {"Stream": "RTP-Unicast", "Transport": {"Protocol": "RTSP"}}
+                        rtsp_url = cam.media.GetStreamUri(req).Uri
+                except zeep.exceptions.Fault as e:
+                    logger.warning(
+                        f"IP {ip}:{port} için stream URI alınamadı (Yetkilendirme gerekebilir): {e}"
+                    )
+                except Exception:
+                    logger.warning(f"IP {ip}:{port} için stream URI alınamadı (Genel Hata).")
+
+                result = {"ip": ip, "port": port, "hostname": hostname, "rtsp_url": rtsp_url}
+                logger.info(
+                    f"ONVIF kamera bulundu: IP={ip}:{port}, Hostname={hostname}, RTSP={rtsp_url or 'Bulunamadı'}"
+                )
+
+                if progress_callback:
+                    progress_callback({"event": "found", "camera": result})
+
+                return result
+            except Exception:
+                return None
 
         subnets = set()
         for iface in netifaces.interfaces():
@@ -927,14 +970,15 @@ def discover_onvif_cameras():
             logger.warning("Taranacak ağ arayüzü bulunamadı.")
             return []
 
-        logger.info(f"Taranacak ağlar: {list(subnets)}")
+        logger.info(f"Taranacak ağlar: {list(subnets)} üzerinde Portlar: {COMMON_ONVIF_PORTS}")
 
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        with ThreadPoolExecutor(max_workers=100) as executor:
             futures = []
             for subnet_base in subnets:
                 for i in range(1, 255):
                     ip_to_check = f"{subnet_base}.{i}"
-                    futures.append(executor.submit(check_onvif_camera, ip_to_check))
+                    for port in COMMON_ONVIF_PORTS:
+                        futures.append(executor.submit(check_onvif_camera, ip_to_check, port))
 
             for future in as_completed(futures):
                 result = future.result()
@@ -942,7 +986,7 @@ def discover_onvif_cameras():
                     discovered_cameras.append(result)
 
         logger.info(
-            f"Keşif tamamlandı. Toplam {len(discovered_cameras)} kamera bulundu."
+            f"Keşif tamamlandı. Toplam {len(discovered_cameras)} potansiyel kamera servisi bulundu."
         )
         return discovered_cameras
 
@@ -969,6 +1013,38 @@ def discover_cameras():
     except Exception as e:
         logger.error(f"Kamera keşfi API hatası: {e}")
         return jsonify({"success": False, "message": str(e)})
+
+
+@app.route("/discover_cameras_stream")
+@login_required
+def discover_cameras_stream():
+    """Ağ taramasını SSE ile gerçekleştirmek için endpoint"""
+
+    def event_stream():
+        q = queue.Queue()
+
+        def progress(data):
+            q.put(data)
+
+        def run_scan():
+            cams = discover_onvif_cameras(progress_callback=progress)
+            q.put({"event": "done", "cameras": cams})
+
+        threading.Thread(target=run_scan, daemon=True).start()
+
+        while True:
+            item = q.get()
+            event = item.get("event")
+            if event == "done":
+                yield f"event: done\ndata: {json.dumps(item['cameras'])}\n\n"
+                break
+            elif event == "found":
+                yield f"event: found\ndata: {json.dumps(item['camera'])}\n\n"
+            elif event == "scan":
+                payload = json.dumps({"ip": item['ip'], "port": item['port']})
+                yield f"event: scan\ndata: {payload}\n\n"
+
+    return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
 
 
 def startup_sequence():
