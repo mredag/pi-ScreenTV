@@ -103,9 +103,9 @@ app.config["UPLOAD_FOLDER"] = VIDEO_DIR
 app.config["IMAGE_UPLOAD_FOLDER"] = IMAGE_DIR
 # Remove upload size limit
 # Flask checks MAX_CONTENT_LENGTH and rejects requests larger than this
-# value with a 413 status. By not setting it we allow uploads of any size
-if "MAX_CONTENT_LENGTH" in app.config:
-    del app.config["MAX_CONTENT_LENGTH"]
+# value with a 413 status. Some versions of Flask assume this key exists,
+# so set it explicitly to ``None`` to disable the limit.
+app.config["MAX_CONTENT_LENGTH"] = None
 
 # Flask-Login kurulumu
 login_manager = LoginManager()
