@@ -71,6 +71,8 @@ logger = logging.getLogger("PiEkran")
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = VIDEO_DIR
 app.config["IMAGE_UPLOAD_FOLDER"] = IMAGE_DIR
+# Allow large uploads (e.g. up to 1GB)
+app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024
 
 # Flask-Login kurulumu
 login_manager = LoginManager()
