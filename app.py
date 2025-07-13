@@ -267,6 +267,7 @@ class MediaPlayer:
                 # MPV komutunu oluştur
                 cmd = ["mpv"] + self.config.get("mpv_options", [])
                 cmd += ["--input-ipc-server=/tmp/mpvsocket", "--loop-playlist=inf"]
+                cmd += video_paths
                 if self.config.get("enable_mpv_logging", False):
                     cmd.append(f"--log-file={MPV_LOG_FILE}")
 

@@ -401,6 +401,24 @@ body {
     transform: translateY(-1px);
 }
 
+/* Upload Progress Bar */
+.upload-progress {
+    width: 100%;
+    height: 8px;
+    margin-top: var(--space-3);
+    appearance: none;
+}
+
+.upload-progress::-webkit-progress-bar {
+    background-color: var(--border-light);
+    border-radius: var(--radius-lg);
+}
+
+.upload-progress::-webkit-progress-value {
+    background-color: var(--accent-color);
+    border-radius: var(--radius-lg);
+}
+
 /* Button Grid */
 .button-grid {
     display: grid;

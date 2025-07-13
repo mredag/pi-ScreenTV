@@ -47,3 +47,25 @@ def test_play_video_reports_log_on_failure(tmp_path):
         assert not success
         assert "mpv" in msg
         assert os.path.exists(log_file)
+
+
+def test_play_video_passes_paths(tmp_path):
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}")
+    with patch.object(app, "CONFIG_FILE", str(cfg)):
+        player = app.MediaPlayer()
+
+        class DummyProc:
+            def poll(self):
+                return None
+
+        with patch("shutil.which", return_value="/usr/bin/mpv"), \
+            patch("subprocess.Popen", return_value=DummyProc()) as popen_mock, \
+            patch("os.path.exists", return_value=True), \
+            patch("time.sleep"):
+            player.play_video(video_list=["a.mp4", "b.mp4"])
+
+        args, _ = popen_mock.call_args
+        cmd = args[0]
+        assert os.path.join(app.VIDEO_DIR, "a.mp4") in cmd
+        assert os.path.join(app.VIDEO_DIR, "b.mp4") in cmd
