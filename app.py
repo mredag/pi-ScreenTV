@@ -55,11 +55,11 @@ os.makedirs(IMAGE_DIR, exist_ok=True)
 
 # Logging yapılandırması
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(
-            os.path.join(LOG_DIR, f'pi-ekran_{datetime.now().strftime("%Y%m%d")}.log'),
+            os.path.join(LOG_DIR, f"pi-ekran_{datetime.now().strftime('%Y%m%d')}.log"),
             encoding="utf-8",
         ),
         logging.StreamHandler(),
@@ -109,6 +109,11 @@ class MediaPlayer:
         self.automation_paused = False
         self.config = self.load_config()
 
+        log_level = self.config.get("log_level", "INFO").upper()
+        level_value = getattr(logging, log_level, logging.INFO)
+        logger.setLevel(level_value)
+        logging.getLogger().setLevel(level_value)
+
         self.videos = self.get_video_files()
 
         self.scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
@@ -123,6 +128,8 @@ class MediaPlayer:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 config = json.load(f)
                 logger.info("Yapılandırma dosyası yüklendi")
+                config.setdefault("enable_mpv_logging", False)
+                config.setdefault("log_level", "INFO")
                 return config
         except Exception as e:
             logger.error(f"Yapılandırma dosyası yüklenemedi: {e}")
@@ -141,6 +148,8 @@ class MediaPlayer:
                 "SECRET_KEY": "change-me",
                 "USERNAME": "admin",
                 "PASSWORD_HASH": "",
+                "enable_mpv_logging": False,
+                "log_level": "INFO",
             }
 
     def save_config(self):
@@ -221,22 +230,21 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = (
-                    ["mpv"]
-                    + self.config.get("mpv_options", [])
-                    + [
-                        f"--log-file={MPV_LOG_FILE}",
-                        "--input-ipc-server=/tmp/mpvsocket",
-                        "--loop-playlist=inf",
-                    ]
-                    + video_paths
-                )
+                cmd = ["mpv"] + self.config.get("mpv_options", [])
+                cmd += ["--input-ipc-server=/tmp/mpvsocket", "--loop-playlist=inf"]
+                if self.config.get("enable_mpv_logging", False):
+                    cmd.append(f"--log-file={MPV_LOG_FILE}")
 
-                # İşlemi başlat
-                with open(MPV_LOG_FILE, "a") as log_file:
-                    self.current_process = subprocess.Popen(
-                        cmd, stdout=log_file, stderr=log_file
-                    )
+                if self.config.get("enable_mpv_logging", False):
+                    log_target = open(MPV_LOG_FILE, "a")
+                else:
+                    open(MPV_LOG_FILE, "a").close()
+                    log_target = subprocess.DEVNULL
+                try:
+                    self.current_process = subprocess.Popen(cmd, stdout=log_target, stderr=log_target)
+                finally:
+                    if log_target is not subprocess.DEVNULL:
+                        log_target.close()
 
                 time.sleep(1)
                 if self.current_process.poll() is not None:
@@ -282,17 +290,21 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = (
-                    ["mpv"]
-                    + self.config.get("mpv_options", [])
-                    + [f"--log-file={MPV_LOG_FILE}", "--input-ipc-server=/tmp/mpvsocket", camera_url]
-                )
+                cmd = ["mpv"] + self.config.get("mpv_options", [])
+                cmd += ["--input-ipc-server=/tmp/mpvsocket", camera_url]
+                if self.config.get("enable_mpv_logging", False):
+                    cmd.append(f"--log-file={MPV_LOG_FILE}")
 
-                # İşlemi başlat
-                with open(MPV_LOG_FILE, "a") as log_file:
-                    self.current_process = subprocess.Popen(
-                        cmd, stdout=log_file, stderr=log_file
-                    )
+                if self.config.get("enable_mpv_logging", False):
+                    log_target = open(MPV_LOG_FILE, "a")
+                else:
+                    open(MPV_LOG_FILE, "a").close()
+                    log_target = subprocess.DEVNULL
+                try:
+                    self.current_process = subprocess.Popen(cmd, stdout=log_target, stderr=log_target)
+                finally:
+                    if log_target is not subprocess.DEVNULL:
+                        log_target.close()
 
                 time.sleep(1)
                 if self.current_process.poll() is not None:
@@ -332,20 +344,22 @@ class MediaPlayer:
 
         with self.lock:
             try:
-                cmd = (
-                    ["mpv"]
-                    + self.config.get("mpv_options", [])
-                    + [
-                        f"--log-file={MPV_LOG_FILE}",
-                        f"--image-display-duration={interval}",
-                        "--loop-playlist=inf",
-                    ]
-                    + image_paths
-                )
-                with open(MPV_LOG_FILE, "a") as log_file:
-                    self.current_process = subprocess.Popen(
-                        cmd, stdout=log_file, stderr=log_file
-                    )
+                cmd = ["mpv"] + self.config.get("mpv_options", [])
+                cmd += [f"--image-display-duration={interval}", "--loop-playlist=inf"]
+                if self.config.get("enable_mpv_logging", False):
+                    cmd.append(f"--log-file={MPV_LOG_FILE}")
+                cmd += image_paths
+
+                if self.config.get("enable_mpv_logging", False):
+                    log_target = open(MPV_LOG_FILE, "a")
+                else:
+                    open(MPV_LOG_FILE, "a").close()
+                    log_target = subprocess.DEVNULL
+                try:
+                    self.current_process = subprocess.Popen(cmd, stdout=log_target, stderr=log_target)
+                finally:
+                    if log_target is not subprocess.DEVNULL:
+                        log_target.close()
 
                 time.sleep(1)
                 if self.current_process.poll() is not None:
