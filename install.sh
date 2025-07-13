@@ -23,7 +23,8 @@ step "1. Updating system packages"
 sudo apt update -y && sudo apt upgrade -y
 
 step "2. Installing dependencies"
-sudo apt install -y python3 python3-venv python3-pip mpv git
+# Nginx'i bağımlılıklara ekliyoruz
+sudo apt install -y python3 python3-venv python3-pip mpv git nginx avahi-daemon # avahi mDNS için eklendi
 
 step "3. Setting up Python virtual environment"
 python3 -m venv venv
@@ -33,7 +34,7 @@ pip install -r requirements.txt
 deactivate
 
 step "4. Creating required directories"
-mkdir -p videos logs images
+mkdir -p videos logs static/images # <-- 'static/images' eklendi
 
 if [ -f logo.png ]; then
   step "Setting desktop wallpaper"
@@ -46,18 +47,49 @@ if ! command -v mpv >/dev/null; then
   exit 1
 fi
 
-step "6. Copying systemd service"
+# <-- YENİ BÖLÜM BAŞLANGICI -->
+step "6. Configuring network access for easy use"
+step "   - Setting hostname to 'eformtv'"
+sudo hostnamectl set-hostname eformtv
+
+step "   - Configuring Nginx as a reverse proxy (port 80 -> 5000)"
+# /etc/nginx/sites-available/default dosyasını aşağıdaki içerikle yeniden yazıyoruz
+sudo tee /etc/nginx/sites-available/default > /dev/null <<'EOF'
+server {
+    listen 80;
+    server_name eformtv.local;
+
+    # Allow large file uploads through Nginx
+    # 0 disables the limit completely; adjust as needed
+    client_max_body_size 0;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+step "   - Enabling and restarting Nginx service"
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+# <-- YENİ BÖLÜM SONU -->
+
+step "7. Copying systemd service" # <-- Adım numarası güncellendi
 sudo cp pi-ekran.service /etc/systemd/system/pi-ekran.service
 sudo systemctl daemon-reload
 sudo systemctl enable pi-ekran.service
 
-step "7. Running basic tests"
+step "8. Running basic tests" # <-- Adım numarası güncellendi
 python3 -m py_compile app.py
 
-step "8. Starting service"
+step "9. Starting the main application service" # <-- Adım numarası güncellendi
 sudo systemctl restart pi-ekran.service
 sleep 2
 sudo systemctl status pi-ekran.service --no-pager || true
 
-IP=$(hostname -I | awk '{print $1}')
-echo -e "${GREEN}Installation complete. Access the web interface at: http://${IP}:5000${NC}"
+# IP adresini bulmaya artık gerek yok, sabit bir domain kullanıyoruz.
+echo -e "${GREEN}Installation complete. Access the web interface at: http://eformtv.local${NC}" # <-- DEĞİŞTİRİLDİ

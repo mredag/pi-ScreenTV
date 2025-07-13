@@ -364,6 +364,18 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+/* Scan progress area */
+.scan-progress {
+    margin-bottom: var(--space-4);
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.scan-progress .scanned-ip {
+    padding: 2px 0;
+}
+
 /* Upload Area */
 .upload-area {
     margin-bottom: var(--space-6);
@@ -399,6 +411,24 @@ body {
 .upload-label:hover {
     background: var(--accent-light);
     transform: translateY(-1px);
+}
+
+/* Upload Progress Bar */
+.upload-progress {
+    width: 100%;
+    height: 8px;
+    margin-top: var(--space-3);
+    appearance: none;
+}
+
+.upload-progress::-webkit-progress-bar {
+    background-color: var(--border-light);
+    border-radius: var(--radius-lg);
+}
+
+.upload-progress::-webkit-progress-value {
+    background-color: var(--accent-color);
+    border-radius: var(--radius-lg);
 }
 
 /* Button Grid */
@@ -787,3 +817,12 @@ body {
 .block { display: block; }
 .flex { display: flex; }
 .grid { display: grid; }
+
+.image-item img {
+    max-width: 80px;
+    max-height: 80px;
+    object-fit: cover;
+    border-radius: 8px;   /* köşeler yumuşak olur */
+    display: block;
+    margin: 0 auto;
+}

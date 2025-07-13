@@ -1,9 +1,21 @@
 // Pi-Ekran JavaScript Kontrol Kodu
 
+async function apiFetch(url, options = {}) {
+    options.credentials = 'same-origin';
+    const response = await fetch(url, options);
+    if (response.status === 401) {
+        // Oturum süresi dolduysa giriş sayfasına yönlendir
+        window.location.href = '/login';
+        throw new Error('Yetkilendirme gerekiyor');
+    }
+    return response;
+}
+
 class PiEkranController {
     constructor() {
         this.isProcessing = false;
         this.statusCheckInterval = null;
+        this.scanSource = null;
         
         // DOM elementleri
         this.elements = {
@@ -13,8 +25,7 @@ class PiEkranController {
             stopBtn: document.getElementById('stopBtn'),
             announceBtn: document.getElementById("announceBtn"),
             uploadInput: document.getElementById('uploadInput'),
-            imageUploadInput: document.getElementById('imageUploadInput'),
-            resumeBtn: document.getElementById('resumeBtn'),
+            imageUploadInput: document.getElementById('imageUploadInput'),            
             cameraList: document.getElementById('cameraList'),
             videoList: document.getElementById('videoList'),
             currentSource: document.getElementById('currentSource'),
@@ -34,6 +45,7 @@ class PiEkranController {
             scanButtonText: document.getElementById('scanButtonText'),
             scanResults: document.getElementById('scanResults'),
             discoveredCameras: document.getElementById('discoveredCameras'),
+            scanProgress: document.getElementById('scanProgress'),
             credentialModal: document.getElementById('credentialModal'),
             closeCredentialModal: document.getElementById('closeCredentialModal'),
             credentialForm: document.getElementById('credentialForm'),
@@ -44,6 +56,8 @@ class PiEkranController {
             closeSlideshowModal: document.getElementById('closeSlideshowModal'),
             slideshowForm: document.getElementById('slideshowForm'),
             slideshowImageList: document.getElementById('slideshowImageList'),
+            videoUploadProgress: document.getElementById('videoUploadProgress'),
+            imageUploadProgress: document.getElementById('imageUploadProgress'),
         };
         
         // Event listener'ları ekle
@@ -61,6 +75,13 @@ class PiEkranController {
 
         // Kameraları yükle
         this.loadCameras();
+
+        // Görselleri yükle
+        this.loadImages();
+
+        for (const [key, el] of Object.entries(this.elements)) {
+            if (!el) console.error(`Element with id '${key}' not found in DOM`);
+        }
     }
     
     bindEvents() {
@@ -69,8 +90,7 @@ class PiEkranController {
         this.elements.stopBtn.addEventListener('click', () => this.stop());
         this.elements.announceBtn.addEventListener('click', () => this.announce());
         this.elements.uploadInput.addEventListener('change', () => this.uploadVideo());
-        this.elements.imageUploadInput.addEventListener('change', () => this.uploadImage());
-        this.elements.resumeBtn.addEventListener('click', () => this.resume());
+        this.elements.imageUploadInput.addEventListener('change', () => this.uploadImage());        
         
         // Modal event listeners
         this.elements.cameraSettingsBtn.addEventListener('click', () => this.openCameraModal());
@@ -132,8 +152,8 @@ class PiEkranController {
     async checkStatus() {
         try {
             const [statusRes, camRes] = await Promise.all([
-                fetch('/status'),
-                fetch('/cameras')
+                apiFetch('/status'),
+                apiFetch('/cameras')
             ]);
             const status = await statusRes.json();
             const cams = await camRes.json();
@@ -145,7 +165,7 @@ class PiEkranController {
 
     async checkSystemInfo() {
         try {
-            const response = await fetch('/system_info');
+            const response = await apiFetch('/system_info');
             const data = await response.json();
             this.elements.cpuTemp.textContent = data.temperature;
             this.elements.diskUsage.textContent = data.disk_usage;
@@ -186,8 +206,7 @@ class PiEkranController {
             this.elements.playSlideshowBtn.disabled = false;
             this.elements.announceBtn.disabled = false;
             this.elements.stopBtn.disabled = !status.playing;
-            this.elements.resumeBtn.disabled = !status.automation_paused;
-            
+                        
             // Buton durumlarını güncelle
             this.elements.playVideoBtn.classList.remove('loading');
             this.elements.stopBtn.classList.remove('loading');
@@ -206,7 +225,7 @@ class PiEkranController {
         this.addLog('Video oynatma isteği gönderiliyor...');
 
         try {
-            const response = await fetch('/play_video', {
+            const response = await apiFetch('/play_video', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({videos: selected})
@@ -235,7 +254,7 @@ class PiEkranController {
         this.addLog('Kamera yayını isteği gönderiliyor...');
         
         try {
-            const response = await fetch('/play_camera', { method: 'POST' });
+            const response = await apiFetch('/play_camera', { method: 'POST' });
             const data = await response.json();
             
             if (data.success) {
@@ -257,7 +276,7 @@ class PiEkranController {
         this.disableAllButtons();
         this.addLog('Kamera yayını isteği gönderiliyor...');
         try {
-            const response = await fetch('/play_camera', {
+            const response = await apiFetch('/play_camera', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name})
@@ -284,7 +303,7 @@ class PiEkranController {
         this.addLog('Slayt gösterisi isteği gönderiliyor...');
 
         try {
-            const response = await fetch('/play_slideshow', {
+            const response = await apiFetch('/play_slideshow', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({images: images, interval: interval})
@@ -314,7 +333,7 @@ class PiEkranController {
         this.addLog('Durdurma isteği gönderiliyor...');
         
         try {
-            const response = await fetch('/stop', { method: 'POST' });
+            const response = await apiFetch('/stop', { method: 'POST' });
             const data = await response.json();
             
             if (data.success) {
@@ -334,7 +353,7 @@ class PiEkranController {
 
     async loadVideos() {
         try {
-            const response = await fetch('/videos');
+            const response = await apiFetch('/videos');
             const data = await response.json();
             this.renderVideoList(data.videos || []);
         } catch (e) {
@@ -344,7 +363,7 @@ class PiEkranController {
 
     async loadCameras() {
         try {
-            const response = await fetch('/cameras');
+            const response = await apiFetch('/cameras');
             const data = await response.json();
             this.renderCameraList(data.cameras || []);
         } catch (e) {
@@ -355,14 +374,24 @@ class PiEkranController {
     renderVideoList(list) {
         this.elements.videoList.innerHTML = '';
         list.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'video-item';
+
             const label = document.createElement('label');
-            label.className = 'video-item';
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.value = name;
             label.appendChild(cb);
             label.appendChild(document.createTextNode(' ' + name));
-            this.elements.videoList.appendChild(label);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.onclick = () => this.deleteVideo(name);
+
+            item.appendChild(label);
+            item.appendChild(deleteBtn);
+            this.elements.videoList.appendChild(item);
         });
     }
 
@@ -384,28 +413,49 @@ class PiEkranController {
         this.isProcessing = true;
         this.disableAllButtons();
         this.addLog(`${files.length} video yükleniyor...`);
+        const progress = this.elements.videoUploadProgress;
+        progress.style.display = 'block';
+        progress.value = 0;
 
         const formData = new FormData();
         for (const file of files) {
             formData.append('files[]', file);
         }
 
-        try {
-            const res = await fetch('/upload', {method: 'POST', body: formData});
-            const data = await res.json();
-            if (data.success) {
-                this.addLog('Video(lar) başarıyla yüklendi', 'success');
-                this.loadVideos();
-            } else {
-                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
-            }
-        } catch (e) {
-            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
-        } finally {
-            this.isProcessing = false;
-            this.updateButtons({playing:false});
-            this.elements.uploadInput.value = ''; // Reset file input
-        }
+        await new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload');
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    progress.value = (e.loaded / e.total) * 100;
+                }
+            };
+            xhr.onload = () => {
+                progress.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        this.addLog('Video(lar) başarıyla yüklendi', 'success');
+                        this.loadVideos();
+                    } else {
+                        this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+                    }
+                } catch (err) {
+                    this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                }
+                resolve();
+            };
+            xhr.onerror = () => {
+                progress.style.display = 'none';
+                this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                resolve();
+            };
+            xhr.send(formData);
+        });
+
+        this.isProcessing = false;
+        this.updateButtons({playing:false});
+        this.elements.uploadInput.value = '';
     }
 
     async uploadImage() {
@@ -415,34 +465,55 @@ class PiEkranController {
         this.isProcessing = true;
         this.disableAllButtons();
         this.addLog(`${files.length} görsel yükleniyor...`);
+        const progress = this.elements.imageUploadProgress;
+        progress.style.display = 'block';
+        progress.value = 0;
 
         const formData = new FormData();
         for (const file of files) {
             formData.append('files[]', file);
         }
 
-        try {
-            const res = await fetch('/upload_image', {method: 'POST', body: formData});
-            const data = await res.json();
-            if (data.success) {
-                this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
-            } else {
-                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
-            }
-        } catch (e) {
-            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
-        } finally {
-            this.isProcessing = false;
-            this.updateButtons({playing:false});
-            this.elements.imageUploadInput.value = ''; // Reset file input
-        }
+        await new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload_image');
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    progress.value = (e.loaded / e.total) * 100;
+                }
+            };
+            xhr.onload = () => {
+                progress.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
+                    } else {
+                        this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+                    }
+                } catch (err) {
+                    this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                }
+                resolve();
+            };
+            xhr.onerror = () => {
+                progress.style.display = 'none';
+                this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                resolve();
+            };
+            xhr.send(formData);
+        });
+
+        this.isProcessing = false;
+        this.updateButtons({playing:false});
+        this.elements.imageUploadInput.value = '';
     }
 
     async resume() {
         this.isProcessing = true;
         this.disableAllButtons();
         try {
-            await fetch('/resume', {method: 'POST'});
+            await apiFetch('/resume', {method: 'POST'});
             this.addLog('Otomasyon devam ediyor', 'success');
             this.checkStatus();
         } finally {
@@ -459,7 +530,7 @@ class PiEkranController {
         this.elements.announceBtn.classList.add("loading");
         this.addLog("Duyuru gönderiliyor...");
         try {
-            const response = await fetch("/announce", {
+            const response = await apiFetch("/announce", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({ message: text })
@@ -481,8 +552,7 @@ class PiEkranController {
         this.elements.playVideoBtn.disabled = true;
         this.elements.playSlideshowBtn.disabled = true;
         this.elements.stopBtn.disabled = true;
-        this.elements.announceBtn.disabled = true;
-        this.elements.resumeBtn.disabled = true;
+        this.elements.announceBtn.disabled = true;        
     }
     
     handleError(message) {
@@ -529,7 +599,7 @@ class PiEkranController {
 
     async loadModalCameras() {
         try {
-            const response = await fetch('/cameras');
+            const response = await apiFetch('/cameras');
             const data = await response.json();
             this.renderModalCameraList(data.cameras || []);
         } catch (e) {
@@ -569,7 +639,7 @@ class PiEkranController {
         if (!name || !url) return;
 
         try {
-            const response = await fetch('/cameras', {
+            const response = await apiFetch('/cameras', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name, url})
@@ -592,7 +662,7 @@ class PiEkranController {
         if (!confirm(`'${name}' adlı kamerayı silmek istediğinizden emin misiniz?`)) return;
 
         try {
-            const response = await fetch('/cameras', {
+            const response = await apiFetch('/cameras', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name})
@@ -610,19 +680,227 @@ class PiEkranController {
         }
     }
 
+    async scanNetwork() {
+        this.elements.scanButtonText.textContent = 'Ağ Taranıyor...';
+        this.elements.scanNetworkBtn.disabled = true;
+        this.elements.scanResults.style.display = 'block';
+        this.elements.discoveredCameras.innerHTML = '';
+        if (this.elements.scanProgress) {
+            this.elements.scanProgress.innerHTML = '';
+        }
+        this.addLog('Ağdaki kameralar taranıyor...');
+
+        if (this.scanSource) {
+            this.scanSource.close();
+            this.scanSource = null;
+        }
+
+        this.scanSource = new EventSource('/discover_cameras_stream');
+
+        this.scanSource.addEventListener('scan', (e) => {
+            const data = JSON.parse(e.data);
+            const div = document.createElement('div');
+            div.className = 'scanned-ip';
+            div.textContent = `Taranıyor: ${data.ip}:${data.port}`;
+            if (this.elements.scanProgress) {
+                this.elements.scanProgress.appendChild(div);
+                this.elements.scanProgress.scrollTop = this.elements.scanProgress.scrollHeight;
+            }
+        });
+
+        this.scanSource.addEventListener('found', (e) => {
+            const cam = JSON.parse(e.data);
+            // Kameralar sonlandığında render edilecek
+        });
+
+        this.scanSource.addEventListener('done', (e) => {
+            const cameras = JSON.parse(e.data);
+            this.addLog(`${cameras.length} kamera bulundu.`, 'success');
+            this.renderDiscoveredCameras(cameras);
+            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
+            this.elements.scanNetworkBtn.disabled = false;
+            this.scanSource.close();
+            this.scanSource = null;
+        });
+
+        this.scanSource.onerror = () => {
+            this.addLog('Ağ taraması başarısız', 'error');
+            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
+            this.elements.scanNetworkBtn.disabled = false;
+            if (this.scanSource) {
+                this.scanSource.close();
+                this.scanSource = null;
+            }
+        };
+    }
+
+    renderDiscoveredCameras(cameras) {
+        this.elements.scanResults.style.display = 'block';
+        const list = this.elements.discoveredCameras;
+        list.innerHTML = '';
+
+        if (cameras.length === 0) {
+            list.innerHTML = '<p>Ağda ONVIF kamera bulunamadı.</p>';
+            return;
+        }
+
+        cameras.forEach(camera => {
+            const item = document.createElement('div');
+            item.className = 'discovered-camera-item';
+            item.innerHTML = `
+                <span>${camera.hostname || 'İsimsiz Kamera'} (${camera.ip}:${camera.port})</span>
+                <button class="add-btn">Ekle</button>
+            `;
+            item.querySelector('.add-btn').addEventListener('click', () => {
+                this.openCredentialModal(camera);
+            });
+            list.appendChild(item);
+        });
+    }
+
+    openCredentialModal(camera) {
+        this.elements.credentialModal.classList.add('show');
+        this.elements.credentialForm.dataset.ip = camera.ip;
+        this.elements.credentialForm.dataset.port = camera.port;
+        this.elements.discoveredCameraName.value = camera.hostname || `Kamera ${camera.ip}`;
+    }
+
+    closeCredentialModal() {
+        this.elements.credentialModal.classList.remove('show');
+        this.elements.credentialForm.reset();
+    }
+
+    async addDiscoveredCamera(event) {
+        event.preventDefault();
+        const form = this.elements.credentialForm;
+        const name = this.elements.discoveredCameraName.value;
+        const username = this.elements.cameraUsername.value;
+        const password = this.elements.cameraPassword.value;
+        const ip = form.dataset.ip;
+        const port = form.dataset.port;
+
+        const url = `rtsp://${username}:${password}@${ip}:${port}/stream1`; // Varsayılan stream yolu
+
+        try {
+            const response = await apiFetch('/cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name, url, ip, port, username, password, discovered: true })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Keşfedilen kamera eklendi', 'success');
+                this.loadModalCameras();
+                this.loadCameras();
+                this.closeCredentialModal();
+            } else {
+                this.addLog('Kamera eklenemedi', 'error');
+            }
+        } catch (e) {
+            this.addLog('Kamera eklenirken hata', 'error');
+        }
+    }
+
     // Slideshow Modal Methods
     async openSlideshowModal() {
         this.elements.slideshowModal.classList.add('show');
         await this.loadSlideshowImages();
     }
 
+    async deleteVideo(filename) {
+        if (!confirm(`'${filename}' adlı videoyu silmek istediğinizden emin misiniz?`)) return;
+
+        try {
+            const response = await apiFetch('/delete_video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Video başarıyla silindi', 'success');
+                this.loadVideos(); // Listeyi yenile
+            } else {
+                this.addLog(`Hata: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.handleError('Video silme hatası');
+        }
+    }
+
+    async deleteImage(filename) {
+        if (!confirm(`'${filename}' adlı görseli silmek istediğinizden emin misiniz?`)) return;
+
+        try {
+            const response = await apiFetch('/delete_image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addLog('Görsel başarıyla silindi', 'success');
+                this.loadImages(); // Listeyi yenile
+            } else {
+                this.addLog(`Hata: ${data.message}`, 'error');
+            }
+        } catch (e) {
+            this.handleError('Görsel silme hatası');
+        }
+    }
+
     closeSlideshowModal() {
         this.elements.slideshowModal.classList.remove('show');
     }
 
+    async loadImages() {
+        try {
+            const response = await apiFetch('/images');
+            const data = await response.json();
+            this.renderImageList(data.images || []);
+        } catch (e) {
+            this.addLog('Görsel listesi alınamadı', 'error');
+        }
+    }
+
+    renderImageList(images) {
+    const imageListContainer = document.getElementById('imageList');
+    if (!imageListContainer) return;
+
+    imageListContainer.innerHTML = '';
+    images.forEach(image => {
+        const item = document.createElement('div');
+        item.className = 'image-item';
+
+        const img = document.createElement('img');
+        img.src = `/static/images/${image}`;
+        img.alt = image;
+        img.style.maxWidth = "80px";
+        img.style.maxHeight = "80px";
+        img.style.objectFit = "cover";
+        img.style.borderRadius = "8px";
+        img.style.display = "block";
+        img.style.margin = "0 auto";
+
+        const name = document.createElement('span');
+        name.textContent = image;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '&times;';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = () => this.deleteImage(image);
+
+        item.appendChild(img);
+        item.appendChild(name);
+        item.appendChild(deleteBtn);
+        imageListContainer.appendChild(item);
+    });
+}
+
+
     async loadSlideshowImages() {
         try {
-            const response = await fetch('/images');
+            const response = await apiFetch('/images');
             const data = await response.json();
             this.renderSlideshowImageList(data.images || []);
         } catch (e) {
@@ -663,4 +941,6 @@ class PiEkranController {
     }
 }
 
-const piEkran = new PiEkranController();
+document.addEventListener('DOMContentLoaded', function() {
+    window.piEkran = new PiEkranController();
+});

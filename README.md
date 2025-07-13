@@ -11,8 +11,8 @@ cd ~/pi-ekran
 bash install.sh
 ```
 
-Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://pi-ekran.local:5000` adresinden erişebilirsiniz.
-Yeni yan menülü gösterge panelini kullanmak için `http://pi-ekran.local:5000/dashboard` adresine gidin.
+Kurulum tamamlandığında servis etkinleşir ve web arayüzüne `http://eformtv.local` adresinden erişebilirsiniz.
+Yeni yan menülü gösterge panelini kullanmak için `http://eformtv.local/dashboard` adresine gidin.
 
 ### Güncelleme
 
@@ -57,7 +57,7 @@ sudo systemctl restart pi-ekran.service
 
 SSH ile bağlanın:
 ```bash
-ssh pi@pi-ekran.local
+ssh pi@eformtv.local
 ```
 
 Sistemi güncelleyin:
@@ -146,7 +146,7 @@ python3 app.py
 
 Web tarayıcıda açın:
 ```
-http://pi-ekran.local:5000
+http://eformtv.local
 ```
 
 ## Faz 2: Otomasyon ve Güvenilirlik
@@ -179,7 +179,11 @@ sudo systemctl status pi-ekran.service
 journalctl -u pi-ekran.service -f
 ```
 
-### 4. Dayanıklılık Testi
+### 4. Logging Ayarları
+
+`config.json` dosyasındaki `log_level` ve `enable_mpv_logging` alanlarıyla kaydedilen log miktarını kontrol edebilirsiniz. Varsayılan olarak `enable_mpv_logging` değeri `false` olduğundan MPV'nin ayrıntılı logları yazılmaz. Daha fazla detay görmek isterseniz bu değeri `true` yapabilir ve `log_level` değerini `INFO` ya da `DEBUG` olarak değiştirebilirsiniz.
+
+### 5. Dayanıklılık Testi
 
 Pi'yi yeniden başlatın:
 ```bash
@@ -196,7 +200,9 @@ Sistem açıldıktan sonra web arayüzünün otomatik olarak erişilebilir oldu�
 
 ### Ağ Sorunları
 - Statik IP atayın veya router'da DHCP rezervasyonu yapın
-- Firewall'da 5000 portunu açın
+- `.local` alan adının çalışması için Raspberry Pi'de `avahi-daemon` kurulmuş olmalıdır. Windows istemciler için Bonjour yüklü değilse IP adresini kullanabilirsiniz.
+- Firewall'da 5000 (veya Nginx kullanıyorsanız 80) portunu açın
+- Büyük dosya yüklerken `413 Request Entity Too Large` hatası alırsanız Nginx yapılandırmasına `client_max_body_size 0;` ekleyin
 
 ### Servis Sorunları
 - Logları kontrol edin: `journalctl -u pi-ekran.service -n 50`
