@@ -10,7 +10,16 @@ import subprocess
 import time
 import logging
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    login_required,
+)
+
+from werkzeug.security import check_password_hash, generate_password_hash
 from threading import Lock
 from apscheduler.schedulers.background import BackgroundScheduler
 import signal
@@ -19,6 +28,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from werkzeug.utils import secure_filename
 import psutil
+import shutil
 
 # Uygulama dizini
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +36,44 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 VIDEO_DIR = os.path.join(BASE_DIR, "videos")
 IMAGE_DIR = os.path.join(BASE_DIR, "static", "images")
+MPV_LOG_FILE = os.path.join(LOG_DIR, "mpv.log")
+
+
+def load_app_config():
+    """Yapılandırma dosyasını oku ve varsayılan değerleri ata."""
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        config = {}
+
+    config.setdefault("SECRET_KEY", "change-me")
+    config.setdefault("USERNAME", "admin")
+    config.setdefault("PASSWORD_HASH", "")
+    config.setdefault("log_level", "INFO")
+    config.setdefault("enable_mpv_logging", False)
+    config.setdefault("startup_delay", 5)
+    config.setdefault("web_port", 5000)
+    config.setdefault(
+        "mpv_options",
+        ["--fullscreen", "--no-osc", "--no-input-default-bindings"],
+    )
+    config.setdefault("cameras", [])
+
+    return config
+
+
+app_config = load_app_config()
+
+
+def get_mpv_log_tail(lines: int = 10) -> str:
+    """Return the last few lines of the MPV log file for diagnostics."""
+    try:
+        with open(MPV_LOG_FILE, "r", encoding="utf-8") as f:
+            return "".join(f.readlines()[-lines:])
+    except Exception as e:
+        logger.error(f"MPV log okunamadi: {e}")
+        return ""
 
 # Log dizinini oluştur
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -33,12 +81,14 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 os.makedirs(IMAGE_DIR, exist_ok=True)
 
 # Logging yapılandırması
+log_level = app_config.get("log_level", "INFO").upper()
+level_value = getattr(logging, log_level, logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=level_value,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(
-            os.path.join(LOG_DIR, f'pi-ekran_{datetime.now().strftime("%Y%m%d")}.log'),
+            os.path.join(LOG_DIR, f"pi-ekran_{datetime.now().strftime('%Y%m%d')}.log"),
             encoding="utf-8",
         ),
         logging.StreamHandler(),
@@ -48,8 +98,40 @@ logger = logging.getLogger("PiEkran")
 
 # Flask uygulaması
 app = Flask(__name__)
+app.config.from_mapping(app_config)
 app.config["UPLOAD_FOLDER"] = VIDEO_DIR
 app.config["IMAGE_UPLOAD_FOLDER"] = IMAGE_DIR
+# Remove upload size limit
+# Flask checks MAX_CONTENT_LENGTH and rejects requests larger than this
+# value with a 413 status. Some versions of Flask assume this key exists,
+# so set it explicitly to ``None`` to disable the limit.
+app.config["MAX_CONTENT_LENGTH"] = None
+
+# Flask-Login kurulumu
+login_manager = LoginManager()
+login_manager.login_view = "login"
+login_manager.init_app(app)
+
+
+class User(UserMixin):
+    def __init__(self, username: str):
+        self.id = username
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id == app.config.get("USERNAME"):
+        return User(user_id)
+    return None
+
+
+
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    if request.is_json:
+        return jsonify({"success": False, "message": "Oturum gerekli"}), 401
+    return redirect(url_for("login"))
+
 
 
 class MediaPlayer:
@@ -62,10 +144,18 @@ class MediaPlayer:
         self.automation_paused = False
         self.config = self.load_config()
 
+        log_level = self.config.get("log_level", "INFO").upper()
+        level_value = getattr(logging, log_level, logging.INFO)
+        logger.setLevel(level_value)
+        logging.getLogger().setLevel(level_value)
+
         self.videos = self.get_video_files()
 
         self.scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
         self.start_scheduler()
+
+        if not os.environ.get("DISPLAY"):
+            logger.warning("DISPLAY değişkeni tanımsız. mpv görüntü açamayabilir.")
 
     def load_config(self):
         """Yapılandırma dosyasını yükle"""
@@ -73,6 +163,8 @@ class MediaPlayer:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 config = json.load(f)
                 logger.info("Yapılandırma dosyası yüklendi")
+                config.setdefault("enable_mpv_logging", False)
+                config.setdefault("log_level", "INFO")
                 return config
         except Exception as e:
             logger.error(f"Yapılandırma dosyası yüklenemedi: {e}")
@@ -88,6 +180,11 @@ class MediaPlayer:
                     "--no-input-default-bindings",
                 ],
                 "startup_delay": 5,
+                "SECRET_KEY": "change-me",
+                "USERNAME": "admin",
+                "PASSWORD_HASH": "",
+                "enable_mpv_logging": False,
+                "log_level": "INFO",
             }
 
     def save_config(self):
@@ -141,6 +238,9 @@ class MediaPlayer:
 
     def play_video(self, video_list=None):
         """Video oynat"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         self.videos = self.get_video_files()
         if not video_list:
             if not self.videos:
@@ -165,17 +265,33 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = (
-                    ["mpv"]
-                    + self.config.get("mpv_options", [])
-                    + ["--input-ipc-server=/tmp/mpvsocket", "--loop-playlist=inf"]
-                    + video_paths
-                )
+                cmd = ["mpv"] + self.config.get("mpv_options", [])
+                cmd += ["--input-ipc-server=/tmp/mpvsocket", "--loop-playlist=inf"]
+                cmd += video_paths
+                if self.config.get("enable_mpv_logging", False):
+                    cmd.append(f"--log-file={MPV_LOG_FILE}")
 
-                # İşlemi başlat
-                self.current_process = subprocess.Popen(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
+                if self.config.get("enable_mpv_logging", False):
+                    log_target = open(MPV_LOG_FILE, "a")
+                else:
+                    open(MPV_LOG_FILE, "a").close()
+                    log_target = subprocess.DEVNULL
+                try:
+                    self.current_process = subprocess.Popen(cmd, stdout=log_target, stderr=log_target)
+                finally:
+                    if log_target is not subprocess.DEVNULL:
+                        log_target.close()
+
+                time.sleep(1)
+                if self.current_process.poll() is not None:
+                    logger.error(
+                        f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
+                    )
+                    tail = get_mpv_log_tail()
+                    msg = "mpv başlatılamadı"
+                    if tail:
+                        msg += f"\n{tail}"
+                    return False, msg
 
                 self.current_source = "video"
                 logger.info(f"Video oynatılıyor: {video_paths}")
@@ -187,6 +303,9 @@ class MediaPlayer:
 
     def play_camera(self, name=None):
         """Kamera yayınını göster"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         cameras = self.config.get("cameras", [])
         camera_url = None
         if name:
@@ -207,16 +326,32 @@ class MediaPlayer:
         with self.lock:
             try:
                 # MPV komutunu oluştur
-                cmd = (
-                    ["mpv"]
-                    + self.config.get("mpv_options", [])
-                    + ["--input-ipc-server=/tmp/mpvsocket", camera_url]
-                )
+                cmd = ["mpv"] + self.config.get("mpv_options", [])
+                cmd += ["--input-ipc-server=/tmp/mpvsocket", camera_url]
+                if self.config.get("enable_mpv_logging", False):
+                    cmd.append(f"--log-file={MPV_LOG_FILE}")
 
-                # İşlemi başlat
-                self.current_process = subprocess.Popen(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
+                if self.config.get("enable_mpv_logging", False):
+                    log_target = open(MPV_LOG_FILE, "a")
+                else:
+                    open(MPV_LOG_FILE, "a").close()
+                    log_target = subprocess.DEVNULL
+                try:
+                    self.current_process = subprocess.Popen(cmd, stdout=log_target, stderr=log_target)
+                finally:
+                    if log_target is not subprocess.DEVNULL:
+                        log_target.close()
+
+                time.sleep(1)
+                if self.current_process.poll() is not None:
+                    logger.error(
+                        f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
+                    )
+                    tail = get_mpv_log_tail()
+                    msg = "mpv başlatılamadı"
+                    if tail:
+                        msg += f"\n{tail}"
+                    return False, msg
 
                 self.current_source = "camera"
                 logger.info(f"Kamera yayını başlatıldı: {camera_url}")
@@ -228,6 +363,9 @@ class MediaPlayer:
 
     def play_slideshow(self, images=None, interval=5):
         """Resim slayt gösterisi oynat"""
+        if not shutil.which("mpv"):
+            logger.error("mpv oynaticisi bulunamadi")
+            return False, "mpv yüklü değil"
         if not images:
             image_files = self.get_image_files()
             if not image_files:
@@ -242,13 +380,33 @@ class MediaPlayer:
 
         with self.lock:
             try:
-                cmd = (
-                    ["mpv"]
-                    + self.config.get("mpv_options", [])
-                    + [f"--image-display-duration={interval}", "--loop-playlist=inf"]
-                    + image_paths
-                )
-                self.current_process = subprocess.Popen(cmd)
+                cmd = ["mpv"] + self.config.get("mpv_options", [])
+                cmd += [f"--image-display-duration={interval}", "--loop-playlist=inf"]
+                if self.config.get("enable_mpv_logging", False):
+                    cmd.append(f"--log-file={MPV_LOG_FILE}")
+                cmd += image_paths
+
+                if self.config.get("enable_mpv_logging", False):
+                    log_target = open(MPV_LOG_FILE, "a")
+                else:
+                    open(MPV_LOG_FILE, "a").close()
+                    log_target = subprocess.DEVNULL
+                try:
+                    self.current_process = subprocess.Popen(cmd, stdout=log_target, stderr=log_target)
+                finally:
+                    if log_target is not subprocess.DEVNULL:
+                        log_target.close()
+
+                time.sleep(1)
+                if self.current_process.poll() is not None:
+                    logger.error(
+                        f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
+                    )
+                    tail = get_mpv_log_tail()
+                    msg = "mpv başlatılamadı"
+                    if tail:
+                        msg += f"\n{tail}"
+                    return False, msg
                 self.current_source = "slayt"
                 logger.info(
                     f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_paths)}"
@@ -361,36 +519,99 @@ class MediaPlayer:
 # Global media player instance
 player = MediaPlayer()
 
+# Konfigürasyondan gizli anahtar ve kullanıcı bilgilerini al
+app.config["SECRET_KEY"] = player.config.get("SECRET_KEY", "change-me")
+app.config["USERNAME"] = player.config.get("USERNAME", "admin")
+app.config["PASSWORD_HASH"] = player.config.get("PASSWORD_HASH", "")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        remember = bool(request.form.get("remember"))
+
+        if (
+            username == app.config.get("USERNAME")
+            and check_password_hash(app.config.get("PASSWORD_HASH", ""), password)
+        ):
+            login_user(User(username), remember=remember)
+            flash("Başarıyla giriş yapıldı", "success")
+            return redirect(url_for("dashboard"))
+        else:
+            flash("Kullanıcı adı veya şifre hatalı", "error")
+
+    return render_template("login.html", now=datetime.now())
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("Çıkış yapıldı", "success")
+    return redirect(url_for("login"))
+
+
+
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password")
+        new_pass = request.form.get("new_password")
+        confirm = request.form.get("confirm_password")
+
+        if not check_password_hash(app.config.get("PASSWORD_HASH", ""), current):
+            flash("Mevcut şifre hatalı", "error")
+        elif new_pass != confirm:
+            flash("Yeni şifreler eşleşmiyor", "error")
+        else:
+            new_hash = generate_password_hash(new_pass)
+            app.config["PASSWORD_HASH"] = new_hash
+            player.config["PASSWORD_HASH"] = new_hash
+            player.save_config()
+            flash("Şifre güncellendi", "success")
+            return redirect(url_for("dashboard"))
+
+    return render_template("change_password.html")
+
 
 @app.route("/")
+@login_required
 def index():
     """Ana sayfa"""
     return render_template("dashboard.html")
 
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     """Gelişmiş kontrol paneli"""
     return render_template("dashboard.html")
 
 
 @app.route("/status")
+@login_required
 def status():
     """Sistem durumu"""
     return jsonify(player.get_status())
 
 
 @app.route("/videos")
+@login_required
 def videos():
     return jsonify({"videos": player.get_video_files()})
 
 
 @app.route("/images")
+@login_required
 def images():
     return jsonify({"images": player.get_image_files()})
 
 
 @app.route("/play_video", methods=["POST"])
+@login_required
 def play_video():
     """Video oynatma endpoint'i"""
     logger.info("Video oynatma isteği alındı")
@@ -404,6 +625,7 @@ def play_video():
 
 
 @app.route("/play_camera", methods=["POST"])
+@login_required
 def play_camera():
     """Kamera yayını endpoint'i"""
     logger.info("Kamera yayını isteği alındı")
@@ -417,6 +639,7 @@ def play_camera():
 
 
 @app.route("/play_slideshow", methods=["POST"])
+@login_required
 def play_slideshow():
     """Slayt gösterisi endpoint'i"""
     logger.info("Slayt gösterisi isteği alındı")
@@ -430,6 +653,7 @@ def play_slideshow():
 
 
 @app.route("/stop", methods=["POST"])
+@login_required
 def stop():
     """Oynatmayı durdur"""
     logger.info("Durdurma isteği alındı")
@@ -445,6 +669,7 @@ def stop():
 
 
 @app.route("/announce", methods=["POST"])
+@login_required
 def announce():
     data = request.get_json(force=True)
     message = data.get("message", "") if data else ""
@@ -454,6 +679,7 @@ def announce():
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload():
     if "files[]" not in request.files:
         return jsonify({"success": False, "message": "Dosya bulunamadı"})
@@ -469,6 +695,7 @@ def upload():
 
 
 @app.route("/upload_image", methods=["POST"])
+@login_required
 def upload_image():
     if "files[]" not in request.files:
         return jsonify({"success": False, "message": "Dosya bulunamadı"})
@@ -484,6 +711,7 @@ def upload_image():
 
 
 @app.route("/delete_video", methods=["POST"])
+@login_required
 def delete_video():
     """Video sil"""
     data = request.get_json(silent=True) or {}
@@ -505,6 +733,7 @@ def delete_video():
 
 
 @app.route("/delete_image", methods=["POST"])
+@login_required
 def delete_image():
     """Görsel sil"""
     data = request.get_json(silent=True) or {}
@@ -526,6 +755,7 @@ def delete_image():
 
 
 @app.route("/cameras", methods=["GET", "POST", "DELETE"])
+@login_required
 def cameras():
     if request.method == "GET":
         return jsonify({"cameras": player.config.get("cameras", [])})
@@ -560,12 +790,14 @@ def cameras():
 
 
 @app.route("/resume", methods=["POST"])
+@login_required
 def resume():
     player.resume_automation()
     return jsonify({"success": True})
 
 
 @app.route("/system_info")
+@login_required
 def system_info():
     temp = "N/A"
     disk = "N/A"
@@ -617,6 +849,7 @@ def system_info():
 
 
 @app.route("/logs")
+@login_required
 def logs():
     """Logları getir"""
     try:
@@ -726,6 +959,7 @@ def discover_onvif_cameras():
 
 
 @app.route("/discover_cameras", methods=["POST"])
+@login_required
 def discover_cameras():
     """Ağdaki kameraları keşfet"""
     logger.info("Kamera keşfi isteği alındı")

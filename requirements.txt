@@ -4,3 +4,4 @@ onvif-zeep==0.2.12
 netifaces==0.11.0
 
 psutil
+Flask-Login==0.6.3

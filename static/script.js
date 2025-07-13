@@ -1,5 +1,16 @@
 // Pi-Ekran JavaScript Kontrol Kodu
 
+async function apiFetch(url, options = {}) {
+    options.credentials = 'same-origin';
+    const response = await fetch(url, options);
+    if (response.status === 401) {
+        // Oturum süresi dolduysa giriş sayfasına yönlendir
+        window.location.href = '/login';
+        throw new Error('Yetkilendirme gerekiyor');
+    }
+    return response;
+}
+
 class PiEkranController {
     constructor() {
         this.isProcessing = false;
@@ -43,6 +54,8 @@ class PiEkranController {
             closeSlideshowModal: document.getElementById('closeSlideshowModal'),
             slideshowForm: document.getElementById('slideshowForm'),
             slideshowImageList: document.getElementById('slideshowImageList'),
+            videoUploadProgress: document.getElementById('videoUploadProgress'),
+            imageUploadProgress: document.getElementById('imageUploadProgress'),
         };
         
         // Event listener'ları ekle
@@ -137,8 +150,8 @@ class PiEkranController {
     async checkStatus() {
         try {
             const [statusRes, camRes] = await Promise.all([
-                fetch('/status'),
-                fetch('/cameras')
+                apiFetch('/status'),
+                apiFetch('/cameras')
             ]);
             const status = await statusRes.json();
             const cams = await camRes.json();
@@ -150,7 +163,7 @@ class PiEkranController {
 
     async checkSystemInfo() {
         try {
-            const response = await fetch('/system_info');
+            const response = await apiFetch('/system_info');
             const data = await response.json();
             this.elements.cpuTemp.textContent = data.temperature;
             this.elements.diskUsage.textContent = data.disk_usage;
@@ -210,7 +223,7 @@ class PiEkranController {
         this.addLog('Video oynatma isteği gönderiliyor...');
 
         try {
-            const response = await fetch('/play_video', {
+            const response = await apiFetch('/play_video', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({videos: selected})
@@ -239,7 +252,7 @@ class PiEkranController {
         this.addLog('Kamera yayını isteği gönderiliyor...');
         
         try {
-            const response = await fetch('/play_camera', { method: 'POST' });
+            const response = await apiFetch('/play_camera', { method: 'POST' });
             const data = await response.json();
             
             if (data.success) {
@@ -261,7 +274,7 @@ class PiEkranController {
         this.disableAllButtons();
         this.addLog('Kamera yayını isteği gönderiliyor...');
         try {
-            const response = await fetch('/play_camera', {
+            const response = await apiFetch('/play_camera', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name})
@@ -288,7 +301,7 @@ class PiEkranController {
         this.addLog('Slayt gösterisi isteği gönderiliyor...');
 
         try {
-            const response = await fetch('/play_slideshow', {
+            const response = await apiFetch('/play_slideshow', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({images: images, interval: interval})
@@ -318,7 +331,7 @@ class PiEkranController {
         this.addLog('Durdurma isteği gönderiliyor...');
         
         try {
-            const response = await fetch('/stop', { method: 'POST' });
+            const response = await apiFetch('/stop', { method: 'POST' });
             const data = await response.json();
             
             if (data.success) {
@@ -338,7 +351,7 @@ class PiEkranController {
 
     async loadVideos() {
         try {
-            const response = await fetch('/videos');
+            const response = await apiFetch('/videos');
             const data = await response.json();
             this.renderVideoList(data.videos || []);
         } catch (e) {
@@ -348,7 +361,7 @@ class PiEkranController {
 
     async loadCameras() {
         try {
-            const response = await fetch('/cameras');
+            const response = await apiFetch('/cameras');
             const data = await response.json();
             this.renderCameraList(data.cameras || []);
         } catch (e) {
@@ -398,28 +411,49 @@ class PiEkranController {
         this.isProcessing = true;
         this.disableAllButtons();
         this.addLog(`${files.length} video yükleniyor...`);
+        const progress = this.elements.videoUploadProgress;
+        progress.style.display = 'block';
+        progress.value = 0;
 
         const formData = new FormData();
         for (const file of files) {
             formData.append('files[]', file);
         }
 
-        try {
-            const res = await fetch('/upload', {method: 'POST', body: formData});
-            const data = await res.json();
-            if (data.success) {
-                this.addLog('Video(lar) başarıyla yüklendi', 'success');
-                this.loadVideos();
-            } else {
-                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
-            }
-        } catch (e) {
-            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
-        } finally {
-            this.isProcessing = false;
-            this.updateButtons({playing:false});
-            this.elements.uploadInput.value = ''; // Reset file input
-        }
+        await new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload');
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    progress.value = (e.loaded / e.total) * 100;
+                }
+            };
+            xhr.onload = () => {
+                progress.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        this.addLog('Video(lar) başarıyla yüklendi', 'success');
+                        this.loadVideos();
+                    } else {
+                        this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+                    }
+                } catch (err) {
+                    this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                }
+                resolve();
+            };
+            xhr.onerror = () => {
+                progress.style.display = 'none';
+                this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                resolve();
+            };
+            xhr.send(formData);
+        });
+
+        this.isProcessing = false;
+        this.updateButtons({playing:false});
+        this.elements.uploadInput.value = '';
     }
 
     async uploadImage() {
@@ -429,34 +463,55 @@ class PiEkranController {
         this.isProcessing = true;
         this.disableAllButtons();
         this.addLog(`${files.length} görsel yükleniyor...`);
+        const progress = this.elements.imageUploadProgress;
+        progress.style.display = 'block';
+        progress.value = 0;
 
         const formData = new FormData();
         for (const file of files) {
             formData.append('files[]', file);
         }
 
-        try {
-            const res = await fetch('/upload_image', {method: 'POST', body: formData});
-            const data = await res.json();
-            if (data.success) {
-                this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
-            } else {
-                this.addLog(`Yükleme hatası: ${data.message}`, 'error');
-            }
-        } catch (e) {
-            this.addLog('Yükleme sırasında bir hata oluştu', 'error');
-        } finally {
-            this.isProcessing = false;
-            this.updateButtons({playing:false});
-            this.elements.imageUploadInput.value = ''; // Reset file input
-        }
+        await new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload_image');
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    progress.value = (e.loaded / e.total) * 100;
+                }
+            };
+            xhr.onload = () => {
+                progress.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        this.addLog('Görsel(ler) başarıyla yüklendi', 'success');
+                    } else {
+                        this.addLog(`Yükleme hatası: ${data.message}`, 'error');
+                    }
+                } catch (err) {
+                    this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                }
+                resolve();
+            };
+            xhr.onerror = () => {
+                progress.style.display = 'none';
+                this.addLog('Yükleme sırasında bir hata oluştu', 'error');
+                resolve();
+            };
+            xhr.send(formData);
+        });
+
+        this.isProcessing = false;
+        this.updateButtons({playing:false});
+        this.elements.imageUploadInput.value = '';
     }
 
     async resume() {
         this.isProcessing = true;
         this.disableAllButtons();
         try {
-            await fetch('/resume', {method: 'POST'});
+            await apiFetch('/resume', {method: 'POST'});
             this.addLog('Otomasyon devam ediyor', 'success');
             this.checkStatus();
         } finally {
@@ -473,7 +528,7 @@ class PiEkranController {
         this.elements.announceBtn.classList.add("loading");
         this.addLog("Duyuru gönderiliyor...");
         try {
-            const response = await fetch("/announce", {
+            const response = await apiFetch("/announce", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({ message: text })
@@ -542,7 +597,7 @@ class PiEkranController {
 
     async loadModalCameras() {
         try {
-            const response = await fetch('/cameras');
+            const response = await apiFetch('/cameras');
             const data = await response.json();
             this.renderModalCameraList(data.cameras || []);
         } catch (e) {
@@ -582,7 +637,7 @@ class PiEkranController {
         if (!name || !url) return;
 
         try {
-            const response = await fetch('/cameras', {
+            const response = await apiFetch('/cameras', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name, url})
@@ -605,7 +660,7 @@ class PiEkranController {
         if (!confirm(`'${name}' adlı kamerayı silmek istediğinizden emin misiniz?`)) return;
 
         try {
-            const response = await fetch('/cameras', {
+            const response = await apiFetch('/cameras', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({name})
@@ -631,7 +686,7 @@ class PiEkranController {
         this.addLog('Ağdaki kameralar taranıyor...');
 
         try {
-            const response = await fetch('/discover_cameras', { method: 'POST' });
+            const response = await apiFetch('/discover_cameras', { method: 'POST' });
             const data = await response.json();
 
             if (data.success) {
@@ -696,7 +751,7 @@ class PiEkranController {
         const url = `rtsp://${username}:${password}@${ip}:${port}/stream1`; // Varsayılan stream yolu
 
         try {
-            const response = await fetch('/cameras', {
+            const response = await apiFetch('/cameras', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ name, url, ip, port, username, password, discovered: true })
@@ -725,7 +780,7 @@ class PiEkranController {
         if (!confirm(`'${filename}' adlı videoyu silmek istediğinizden emin misiniz?`)) return;
 
         try {
-            const response = await fetch('/delete_video', {
+            const response = await apiFetch('/delete_video', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: filename })
@@ -746,7 +801,7 @@ class PiEkranController {
         if (!confirm(`'${filename}' adlı görseli silmek istediğinizden emin misiniz?`)) return;
 
         try {
-            const response = await fetch('/delete_image', {
+            const response = await apiFetch('/delete_image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: filename })
@@ -769,7 +824,7 @@ class PiEkranController {
 
     async loadImages() {
         try {
-            const response = await fetch('/images');
+            const response = await apiFetch('/images');
             const data = await response.json();
             this.renderImageList(data.images || []);
         } catch (e) {
@@ -787,7 +842,7 @@ class PiEkranController {
         item.className = 'image-item';
 
         const img = document.createElement('img');
-        img.src = `/images/${image}`;
+        img.src = `/static/images/${image}`;
         img.alt = image;
         img.style.maxWidth = "80px";
         img.style.maxHeight = "80px";
@@ -814,7 +869,7 @@ class PiEkranController {
 
     async loadSlideshowImages() {
         try {
-            const response = await fetch('/images');
+            const response = await apiFetch('/images');
             const data = await response.json();
             this.renderSlideshowImageList(data.images || []);
         } catch (e) {
@@ -856,7 +911,7 @@ class PiEkranController {
     async scanNetwork() {
         this.elements.scanButtonText.textContent = "Ağ taranıyor...";
         try {
-            const response = await fetch('/discover_cameras', {method: 'POST'});
+            const response = await apiFetch('/discover_cameras', {method: 'POST'});
             const data = await response.json();
 
             this.elements.discoveredCameras.innerHTML = '';

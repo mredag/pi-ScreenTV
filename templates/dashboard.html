@@ -54,6 +54,25 @@
                     </svg>
                     <span>Ana Sayfa</span>
                 </a>
+                <a href="{{ url_for('change_password') }}" class="sidebar-link">
+                    <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M12 11v2"/>
+                        <path d="M12 6v2"/>
+                        <path d="M12 16v2"/>
+                        <path d="M8 7h8"/>
+                        <path d="M8 13h8"/>
+                        <path d="M8 19h8"/>
+                    </svg>
+                    <span>Şifre Değiştir</span>
+                </a>
+                <a href="{{ url_for('logout') }}" class="sidebar-link">
+                    <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                        <polyline points="10 17 15 12 10 7"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
+                    <span>Çıkış Yap</span>
+                </a>
             </nav>
             
             <div class="sidebar-footer">
@@ -157,6 +176,7 @@
                                     </svg>
                                     Video Yükle
                                 </label>
+                                <progress id="videoUploadProgress" class="upload-progress" value="0" max="100" style="display:none;"></progress>
                             </div>
 
                             <!-- Image Upload Area -->
@@ -170,6 +190,7 @@
                                     </svg>
                                     Görsel Ekle
                                 </label>
+                                <progress id="imageUploadProgress" class="upload-progress" value="0" max="100" style="display:none;"></progress>
                             </div>
 
                             <!-- Image List -->
