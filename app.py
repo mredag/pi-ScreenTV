@@ -39,6 +39,33 @@ IMAGE_DIR = os.path.join(BASE_DIR, "static", "images")
 MPV_LOG_FILE = os.path.join(LOG_DIR, "mpv.log")
 
 
+def load_app_config():
+    """Yapılandırma dosyasını oku ve varsayılan değerleri ata."""
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        config = {}
+
+    config.setdefault("SECRET_KEY", "change-me")
+    config.setdefault("USERNAME", "admin")
+    config.setdefault("PASSWORD_HASH", "")
+    config.setdefault("log_level", "INFO")
+    config.setdefault("enable_mpv_logging", False)
+    config.setdefault("startup_delay", 5)
+    config.setdefault("web_port", 5000)
+    config.setdefault(
+        "mpv_options",
+        ["--fullscreen", "--no-osc", "--no-input-default-bindings"],
+    )
+    config.setdefault("cameras", [])
+
+    return config
+
+
+app_config = load_app_config()
+
+
 def get_mpv_log_tail(lines: int = 10) -> str:
     """Return the last few lines of the MPV log file for diagnostics."""
     try:
@@ -54,8 +81,10 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 os.makedirs(IMAGE_DIR, exist_ok=True)
 
 # Logging yapılandırması
+log_level = app_config.get("log_level", "INFO").upper()
+level_value = getattr(logging, log_level, logging.INFO)
 logging.basicConfig(
-    level=logging.WARNING,
+    level=level_value,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(
@@ -69,6 +98,7 @@ logger = logging.getLogger("PiEkran")
 
 # Flask uygulaması
 app = Flask(__name__)
+app.config.from_mapping(app_config)
 app.config["UPLOAD_FOLDER"] = VIDEO_DIR
 app.config["IMAGE_UPLOAD_FOLDER"] = IMAGE_DIR
 # Remove upload size limit
