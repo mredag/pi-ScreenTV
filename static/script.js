@@ -15,6 +15,7 @@ class PiEkranController {
     constructor() {
         this.isProcessing = false;
         this.statusCheckInterval = null;
+        this.scanSource = null;
         
         // DOM elementleri
         this.elements = {
@@ -44,6 +45,7 @@ class PiEkranController {
             scanButtonText: document.getElementById('scanButtonText'),
             scanResults: document.getElementById('scanResults'),
             discoveredCameras: document.getElementById('discoveredCameras'),
+            scanProgress: document.getElementById('scanProgress'),
             credentialModal: document.getElementById('credentialModal'),
             closeCredentialModal: document.getElementById('closeCredentialModal'),
             credentialForm: document.getElementById('credentialForm'),
@@ -681,26 +683,55 @@ class PiEkranController {
     async scanNetwork() {
         this.elements.scanButtonText.textContent = 'Ağ Taranıyor...';
         this.elements.scanNetworkBtn.disabled = true;
-        this.elements.scanResults.style.display = 'none';
+        this.elements.scanResults.style.display = 'block';
         this.elements.discoveredCameras.innerHTML = '';
+        if (this.elements.scanProgress) {
+            this.elements.scanProgress.innerHTML = '';
+        }
         this.addLog('Ağdaki kameralar taranıyor...');
 
-        try {
-            const response = await apiFetch('/discover_cameras', { method: 'POST' });
-            const data = await response.json();
+        if (this.scanSource) {
+            this.scanSource.close();
+            this.scanSource = null;
+        }
 
-            if (data.success) {
-                this.addLog(`${data.cameras.length} kamera bulundu.`, 'success');
-                this.renderDiscoveredCameras(data.cameras);
-            } else {
-                this.addLog(`Kamera bulunamadı: ${data.message}`, 'warning');
+        this.scanSource = new EventSource('/discover_cameras_stream');
+
+        this.scanSource.addEventListener('scan', (e) => {
+            const data = JSON.parse(e.data);
+            const div = document.createElement('div');
+            div.className = 'scanned-ip';
+            div.textContent = `Taranıyor: ${data.ip}:${data.port}`;
+            if (this.elements.scanProgress) {
+                this.elements.scanProgress.appendChild(div);
+                this.elements.scanProgress.scrollTop = this.elements.scanProgress.scrollHeight;
             }
-        } catch (e) {
-            this.handleError('Kamera keşfi sırasında bir hata oluştu.');
-        } finally {
+        });
+
+        this.scanSource.addEventListener('found', (e) => {
+            const cam = JSON.parse(e.data);
+            // Kameralar sonlandığında render edilecek
+        });
+
+        this.scanSource.addEventListener('done', (e) => {
+            const cameras = JSON.parse(e.data);
+            this.addLog(`${cameras.length} kamera bulundu.`, 'success');
+            this.renderDiscoveredCameras(cameras);
             this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
             this.elements.scanNetworkBtn.disabled = false;
-        }
+            this.scanSource.close();
+            this.scanSource = null;
+        });
+
+        this.scanSource.onerror = () => {
+            this.addLog('Ağ taraması başarısız', 'error');
+            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
+            this.elements.scanNetworkBtn.disabled = false;
+            if (this.scanSource) {
+                this.scanSource.close();
+                this.scanSource = null;
+            }
+        };
     }
 
     renderDiscoveredCameras(cameras) {
@@ -906,28 +937,6 @@ class PiEkranController {
             this.playSlideshow(selectedImages, interval);
         } else {
             this.addLog('Lütfen slayt gösterisi için en az bir görsel seçin.', 'warning');
-        }
-    }
-    async scanNetwork() {
-        this.elements.scanButtonText.textContent = "Ağ taranıyor...";
-        try {
-            const response = await apiFetch('/discover_cameras', {method: 'POST'});
-            const data = await response.json();
-
-            this.elements.discoveredCameras.innerHTML = '';
-            if (data.success && data.cameras && data.cameras.length > 0) {
-                data.cameras.forEach(cam => {
-                    const li = document.createElement('li');
-                    li.textContent = `${cam.hostname || cam.ip} (${cam.ip}:${cam.port})`;
-                    this.elements.discoveredCameras.appendChild(li);
-                });
-            } else {
-                this.elements.discoveredCameras.innerHTML = '<li>Kamera bulunamadı</li>';
-            }
-        } catch (e) {
-            this.addLog("Ağ taraması başarısız", "error");
-        } finally {
-            this.elements.scanButtonText.textContent = "Ağı Tara ve Kameraları Bul";
         }
     }
 }

@@ -364,6 +364,18 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+/* Scan progress area */
+.scan-progress {
+    margin-bottom: var(--space-4);
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.scan-progress .scanned-ip {
+    padding: 2px 0;
+}
+
 /* Upload Area */
 .upload-area {
     margin-bottom: var(--space-6);
