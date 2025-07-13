@@ -798,7 +798,7 @@ class PiEkranController {
         item.className = 'image-item';
 
         const img = document.createElement('img');
-        img.src = `/images/${image}`;
+        img.src = `/static/images/${image}`;
         img.alt = image;
         img.style.maxWidth = "80px";
         img.style.maxHeight = "80px";
