@@ -71,8 +71,11 @@ logger = logging.getLogger("PiEkran")
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = VIDEO_DIR
 app.config["IMAGE_UPLOAD_FOLDER"] = IMAGE_DIR
-# Allow large uploads (e.g. up to 1GB)
-app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024
+# Remove upload size limit
+# Flask checks MAX_CONTENT_LENGTH and rejects requests larger than this
+# value with a 413 status. By not setting it we allow uploads of any size
+if "MAX_CONTENT_LENGTH" in app.config:
+    del app.config["MAX_CONTENT_LENGTH"]
 
 # Flask-Login kurulumu
 login_manager = LoginManager()
