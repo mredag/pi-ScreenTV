@@ -685,7 +685,9 @@ class PiEkranController {
         this.elements.scanNetworkBtn.disabled = true;
         this.elements.scanResults.style.display = 'block';
         this.elements.discoveredCameras.innerHTML = '';
-        this.elements.scanProgress.innerHTML = '';
+        if (this.elements.scanProgress) {
+            this.elements.scanProgress.innerHTML = '';
+        }
         this.addLog('Ağdaki kameralar taranıyor...');
 
         if (this.scanSource) {
@@ -700,8 +702,10 @@ class PiEkranController {
             const div = document.createElement('div');
             div.className = 'scanned-ip';
             div.textContent = `Taranıyor: ${data.ip}:${data.port}`;
-            this.elements.scanProgress.appendChild(div);
-            this.elements.scanProgress.scrollTop = this.elements.scanProgress.scrollHeight;
+            if (this.elements.scanProgress) {
+                this.elements.scanProgress.appendChild(div);
+                this.elements.scanProgress.scrollTop = this.elements.scanProgress.scrollHeight;
+            }
         });
 
         this.scanSource.addEventListener('found', (e) => {
@@ -934,54 +938,6 @@ class PiEkranController {
         } else {
             this.addLog('Lütfen slayt gösterisi için en az bir görsel seçin.', 'warning');
         }
-    }
-    async scanNetwork() {
-        this.elements.scanButtonText.textContent = 'Ağ Taranıyor...';
-        this.elements.scanNetworkBtn.disabled = true;
-        this.elements.scanResults.style.display = 'block';
-        this.elements.discoveredCameras.innerHTML = '';
-        this.elements.scanProgress.innerHTML = '';
-        this.addLog('Ağdaki kameralar taranıyor...');
-
-        if (this.scanSource) {
-            this.scanSource.close();
-            this.scanSource = null;
-        }
-
-        this.scanSource = new EventSource('/discover_cameras_stream');
-
-        this.scanSource.addEventListener('scan', (e) => {
-            const data = JSON.parse(e.data);
-            const div = document.createElement('div');
-            div.className = 'scanned-ip';
-            div.textContent = `Taranıyor: ${data.ip}:${data.port}`;
-            this.elements.scanProgress.appendChild(div);
-            this.elements.scanProgress.scrollTop = this.elements.scanProgress.scrollHeight;
-        });
-
-        this.scanSource.addEventListener('found', (e) => {
-            const cam = JSON.parse(e.data);
-        });
-
-        this.scanSource.addEventListener('done', (e) => {
-            const cameras = JSON.parse(e.data);
-            this.addLog(`${cameras.length} kamera bulundu.`, 'success');
-            this.renderDiscoveredCameras(cameras);
-            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
-            this.elements.scanNetworkBtn.disabled = false;
-            this.scanSource.close();
-            this.scanSource = null;
-        });
-
-        this.scanSource.onerror = () => {
-            this.addLog('Ağ taraması başarısız', 'error');
-            this.elements.scanButtonText.textContent = 'Ağı Tara ve Kameraları Bul';
-            this.elements.scanNetworkBtn.disabled = false;
-            if (this.scanSource) {
-                this.scanSource.close();
-                this.scanSource = null;
-            }
-        };
     }
 }
 
