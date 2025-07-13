@@ -202,6 +202,7 @@ Sistem açıldıktan sonra web arayüzünün otomatik olarak erişilebilir oldu�
 - Statik IP atayın veya router'da DHCP rezervasyonu yapın
 - `.local` alan adının çalışması için Raspberry Pi'de `avahi-daemon` kurulmuş olmalıdır. Windows istemciler için Bonjour yüklü değilse IP adresini kullanabilirsiniz.
 - Firewall'da 5000 (veya Nginx kullanıyorsanız 80) portunu açın
+- Büyük dosya yüklerken `413 Request Entity Too Large` hatası alırsanız Nginx yapılandırmasına `client_max_body_size 0;` ekleyin
 
 ### Servis Sorunları
 - Logları kontrol edin: `journalctl -u pi-ekran.service -n 50`

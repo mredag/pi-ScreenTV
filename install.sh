@@ -59,6 +59,10 @@ server {
     listen 80;
     server_name eformtv.local;
 
+    # Allow large file uploads through Nginx
+    # 0 disables the limit completely; adjust as needed
+    client_max_body_size 0;
+
     location / {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
