@@ -38,6 +38,16 @@ VIDEO_DIR = os.path.join(BASE_DIR, "videos")
 IMAGE_DIR = os.path.join(BASE_DIR, "static", "images")
 MPV_LOG_FILE = os.path.join(LOG_DIR, "mpv.log")
 
+
+def get_mpv_log_tail(lines: int = 10) -> str:
+    """Return the last few lines of the MPV log file for diagnostics."""
+    try:
+        with open(MPV_LOG_FILE, "r", encoding="utf-8") as f:
+            return "".join(f.readlines()[-lines:])
+    except Exception as e:
+        logger.error(f"MPV log okunamadi: {e}")
+        return ""
+
 # Log dizinini oluştur
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(VIDEO_DIR, exist_ok=True)
@@ -103,6 +113,9 @@ class MediaPlayer:
 
         self.scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
         self.start_scheduler()
+
+        if not os.environ.get("DISPLAY"):
+            logger.warning("DISPLAY değişkeni tanımsız. mpv görüntü açamayabilir.")
 
     def load_config(self):
         """Yapılandırma dosyasını yükle"""
@@ -230,7 +243,11 @@ class MediaPlayer:
                     logger.error(
                         f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
                     )
-                    return False, "mpv başlatılamadı, logları kontrol edin"
+                    tail = get_mpv_log_tail()
+                    msg = "mpv başlatılamadı"
+                    if tail:
+                        msg += f"\n{tail}"
+                    return False, msg
 
                 self.current_source = "video"
                 logger.info(f"Video oynatılıyor: {video_paths}")
@@ -282,7 +299,11 @@ class MediaPlayer:
                     logger.error(
                         f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
                     )
-                    return False, "mpv başlatılamadı, logları kontrol edin"
+                    tail = get_mpv_log_tail()
+                    msg = "mpv başlatılamadı"
+                    if tail:
+                        msg += f"\n{tail}"
+                    return False, msg
 
                 self.current_source = "camera"
                 logger.info(f"Kamera yayını başlatıldı: {camera_url}")
@@ -331,7 +352,11 @@ class MediaPlayer:
                     logger.error(
                         f"mpv başlatılamadı. Çıkış kodu: {self.current_process.returncode}"
                     )
-                    return False, "mpv başlatılamadı, logları kontrol edin"
+                    tail = get_mpv_log_tail()
+                    msg = "mpv başlatılamadı"
+                    if tail:
+                        msg += f"\n{tail}"
+                    return False, msg
                 self.current_source = "slayt"
                 logger.info(
                     f"Slayt gösterisi başlatıldı. Gösterilecek resim sayısı: {len(image_paths)}"

@@ -23,3 +23,27 @@ def test_play_video_mpv_missing(tmp_path):
 
 def test_mpv_log_file_constant():
     assert os.path.basename(app.MPV_LOG_FILE) == "mpv.log"
+
+
+def test_play_video_reports_log_on_failure(tmp_path):
+    cfg = tmp_path / "config.json"
+    cfg.write_text("{}")
+    log_file = tmp_path / "mpv.log"
+    with patch.object(app, "CONFIG_FILE", str(cfg)), patch.object(app, "MPV_LOG_FILE", str(log_file)):
+        player = app.MediaPlayer()
+
+        class DummyProc:
+            returncode = 1
+
+            def poll(self):
+                return 1
+
+        with patch("shutil.which", return_value="/usr/bin/mpv"), \
+            patch("subprocess.Popen", return_value=DummyProc()), \
+            patch("os.path.exists", return_value=True), \
+            patch("time.sleep"):
+            success, msg = player.play_video(video_list=["test.mp4"])
+
+        assert not success
+        assert "mpv" in msg
+        assert os.path.exists(log_file)
