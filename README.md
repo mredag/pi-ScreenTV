@@ -179,7 +179,11 @@ sudo systemctl status pi-ekran.service
 journalctl -u pi-ekran.service -f
 ```
 
-### 4. Dayanıklılık Testi
+### 4. Logging Ayarları
+
+`config.json` dosyasındaki `log_level` ve `enable_mpv_logging` alanlarıyla kaydedilen log miktarını kontrol edebilirsiniz. Varsayılan olarak `enable_mpv_logging` değeri `false` olduğundan MPV'nin ayrıntılı logları yazılmaz. Daha fazla detay görmek isterseniz bu değeri `true` yapabilir ve `log_level` değerini `INFO` ya da `DEBUG` olarak değiştirebilirsiniz.
+
+### 5. Dayanıklılık Testi
 
 Pi'yi yeniden başlatın:
 ```bash
